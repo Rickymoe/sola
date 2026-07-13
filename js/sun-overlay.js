@@ -148,7 +148,28 @@ function createSunPathOverlay() {
 // position always lines up with the direction it names.
 function buildCompassLabels(center) {
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  const labelRadius = SUN_OVERLAY_RADIUS + 14;
+
+  // Drop shadow so the badges read as floating above the map instead of
+  // sitting flush on it -- without this they camouflage against busy
+  // hybrid-map detail (roads, place icons, other labels).
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+  filter.setAttribute('id', 'compass-shadow');
+  filter.setAttribute('x', '-50%');
+  filter.setAttribute('y', '-50%');
+  filter.setAttribute('width', '200%');
+  filter.setAttribute('height', '200%');
+  const dropShadow = document.createElementNS('http://www.w3.org/2000/svg', 'feDropShadow');
+  dropShadow.setAttribute('dx', '0');
+  dropShadow.setAttribute('dy', '1.5');
+  dropShadow.setAttribute('stdDeviation', '1.5');
+  dropShadow.setAttribute('flood-opacity', '0.5');
+  filter.appendChild(dropShadow);
+  defs.appendChild(filter);
+  g.appendChild(defs);
+
+  const rimRadius = SUN_OVERLAY_RADIUS;
+  const labelRadius = SUN_OVERLAY_RADIUS + 20;
   const directions = [
     { label: 'N', dx: 0, dy: -1 },
     { label: '\u00D8', dx: 1, dy: 0 },
@@ -159,12 +180,24 @@ function buildCompassLabels(center) {
     const x = center.x + dx * labelRadius;
     const y = center.y + dy * labelRadius;
 
+    // A thin spoke connects the rim to the floating badge, running
+    // straight through its center -- ties the badge visually back to
+    // the sun-path circle instead of leaving it adrift on the map.
+    const spoke = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    spoke.setAttribute('x1', String(center.x + dx * rimRadius));
+    spoke.setAttribute('y1', String(center.y + dy * rimRadius));
+    spoke.setAttribute('x2', String(x + dx * 10));
+    spoke.setAttribute('y2', String(y + dy * 10));
+    spoke.setAttribute('stroke', '#fff');
+    spoke.setAttribute('stroke-width', '2');
+    g.appendChild(spoke);
+
     const backdrop = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     backdrop.setAttribute('cx', String(x));
     backdrop.setAttribute('cy', String(y));
     backdrop.setAttribute('r', '10');
     backdrop.setAttribute('fill', '#fff');
-    backdrop.setAttribute('opacity', '0.85');
+    backdrop.setAttribute('filter', 'url(#compass-shadow)');
     g.appendChild(backdrop);
 
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
