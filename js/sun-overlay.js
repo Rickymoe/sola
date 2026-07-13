@@ -134,8 +134,8 @@ function createSunPathOverlay() {
           this.svg.appendChild(path);
         }
 
-        this.svg.appendChild(buildSunMarker(offsetPoints[0], this.month.sunrise, true));
-        this.svg.appendChild(buildSunMarker(offsetPoints[offsetPoints.length - 1], this.month.sunset, false));
+        this.svg.appendChild(buildSunMarker(offsetPoints[0], this.month.sunrise, true, this.month.timeZone));
+        this.svg.appendChild(buildSunMarker(offsetPoints[offsetPoints.length - 1], this.month.sunset, false, this.month.timeZone));
       }
     }
   }
@@ -222,7 +222,7 @@ function buildCompassLabels(center) {
 // + time label) centered on one point (already offset for the overlay's
 // own margin). isSunrise flips the arrow direction and swaps in
 // "sunrise"/"sunset" for accessibility.
-function buildSunMarker(point, time, isSunrise) {
+function buildSunMarker(point, time, isSunrise, timeZone) {
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('transform', `translate(${point.x}, ${point.y})`);
 
@@ -271,7 +271,7 @@ function buildSunMarker(point, time, isSunrise) {
   text.setAttribute('stroke', '#fff');
   text.setAttribute('stroke-width', '3');
   text.setAttribute('paint-order', 'stroke');
-  text.textContent = formatTime(time);
+  text.textContent = formatTime(time, timeZone);
   g.appendChild(text);
 
   return g;

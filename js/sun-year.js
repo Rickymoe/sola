@@ -31,18 +31,47 @@ function interpolateCrossing(prev, cur) {
   return new Date(ms);
 }
 
-// Samples one full local day (midnight to midnight) in
-// SUN_SAMPLE_STEP_MINUTES steps, returning the above-horizon path points
-// (for drawing) plus sunrise/sunset found by interpolating the altitude=0
-// crossings. Both null if the sun never crosses 0° that day (polar
-// day/night) -- a real possibility at high latitudes, must not crash.
-function sampleDayArc(date, lat, lng) {
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
+// UTC offset (minutes, local-minus-UTC) for the given instant in the given
+// IANA time zone -- resolves DST correctly since Intl looks up the actual
+// rule in effect at that specific date, not just a fixed offset.
+function getUtcOffsetMinutes(date, timeZone) {
+  const parts = {};
+  for (const { type, value } of new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(date)) {
+    parts[type] = value;
+  }
+  const asUtc = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour), Number(parts.minute), Number(parts.second)
+  );
+  return (asUtc - date.getTime()) / 60000;
+}
+
+// UTC instant (ms) of local midnight for the given calendar date in the
+// given time zone. Guesses the offset from a UTC-midnight anchor, then
+// applies it -- accurate except right at a DST transition, which is an
+// acceptable rare edge case here.
+function zonedMidnightUtcMs(year, month, day, timeZone) {
+  const guessMs = Date.UTC(year, month, day, 0, 0, 0);
+  const offsetMin = getUtcOffsetMinutes(new Date(guessMs), timeZone);
+  return guessMs - offsetMin * 60000;
+}
+
+// Samples one full local day (midnight to midnight, in the given IANA time
+// zone) in SUN_SAMPLE_STEP_MINUTES steps, returning the above-horizon path
+// points (for drawing) plus sunrise/sunset found by interpolating the
+// altitude=0 crossings. Both null if the sun never crosses 0° that day
+// (polar day/night) -- a real possibility at high latitudes, must not crash.
+function sampleDayArc(year, month, day, lat, lng, timeZone) {
+  const dayStartMs = zonedMidnightUtcMs(year, month, day, timeZone);
 
   const samples = [];
   for (let m = 0; m <= 24 * 60; m += SUN_SAMPLE_STEP_MINUTES) {
-    const t = new Date(dayStart.getTime() + m * 60000);
+    const t = new Date(dayStartMs + m * 60000);
     const { azimuthDeg, altitudeDeg } = getSunPosition(t, lat, lng);
     samples.push({ t, azimuthDeg, altitudeDeg });
   }
@@ -75,18 +104,17 @@ function monthColor(fraction) {
 }
 
 // Computes all 12 months' day-arcs + sunrise/sunset for a given location
-// (15th of each month, local noon as the reference moment), colored along
-// a gradient from indigo (shortest day of the 12) to deep orange (longest
-// day of the 12) based on each month's own day length relative to the
-// other 11 at this specific latitude. Returns an array of 12 objects in
-// January-to-December order.
-function getMonthlyOverview(lat, lng, year) {
+// (15th of each month, in the LOCATION's own time zone -- not the
+// browser's), colored along a gradient from indigo (shortest day of the
+// 12) to deep orange (longest day of the 12) based on each month's own day
+// length relative to the other 11 at this specific latitude. Returns an
+// array of 12 objects in January-to-December order.
+function getMonthlyOverview(lat, lng, year, timeZone) {
   const months = [];
   for (let m = 0; m < 12; m++) {
-    const date = new Date(year, m, MONTH_REPRESENTATIVE_DAY, 12, 0, 0);
-    const { points, sunrise, sunset } = sampleDayArc(date, lat, lng);
+    const { points, sunrise, sunset } = sampleDayArc(year, m, MONTH_REPRESENTATIVE_DAY, lat, lng, timeZone);
     const dayLengthMs = sunrise && sunset ? sunset.getTime() - sunrise.getTime() : null;
-    months.push({ name: MONTH_NAMES[m], points, sunrise, sunset, dayLengthMs, color: null });
+    months.push({ name: MONTH_NAMES[m], points, sunrise, sunset, dayLengthMs, color: null, timeZone });
   }
 
   const lengths = months.map((mo) => mo.dayLengthMs).filter((v) => v !== null);
@@ -104,8 +132,17 @@ function getMonthlyOverview(lat, lng, year) {
   return months;
 }
 
-function formatTime(date) {
+// Formats as "HH:MM" in the given IANA time zone -- the location's own
+// local time, not the browser's.
+function formatTime(date, timeZone) {
   if (!date) return '–';
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const parts = {};
+  for (const { type, value } of new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    hour: '2-digit', minute: '2-digit',
+  }).formatToParts(date)) {
+    parts[type] = value;
+  }
+  return `${parts.hour}:${parts.minute}`;
 }

@@ -47,19 +47,77 @@ function setPosition(lat, lng) {
 
   map.panTo({ lat, lng });
   if (sunOverlay) sunOverlay.setPosition(lat, lng);
-  months = getMonthlyOverview(lat, lng, new Date().getFullYear());
+  const timeZone = tzlookup(lat, lng);
+  months = getMonthlyOverview(lat, lng, new Date().getFullYear(), timeZone);
   renderMonthButtons();
   if (sunOverlay) sunOverlay.setMonth(months[selectedMonthIndex]);
   updateClearButtonVisibility();
   playSunriseAnimation();
 }
 
+const SUNRISE_ANIM_RISE_MS = 1400;
+const SUNRISE_ANIM_GLOW_MS = 600;
+const SUNRISE_ANIM_ORBIT_MS = 1600;
+const SUNRISE_ANIM_ORBIT_RADIUS = 4;
+let sunriseAnimFrame = null;
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// Quadratic bezier from (0,0) via (-8,-10) to (0,-18) -- the dot's rise
+// from the horizon to its resting peak.
+function sunriseRisePoint(t) {
+  const p0 = { x: 0, y: 0 };
+  const p1 = { x: -8, y: -10 };
+  const p2 = { x: 0, y: -18 };
+  return {
+    x: (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x,
+    y: (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y,
+  };
+}
+
+// Driven via requestAnimationFrame rather than SMIL: begin="indefinite"
+// animateMotion/animate elements triggered with beginElement() stopped
+// animating reliably in Chrome once nested more than one level below
+// the <svg> root (confirmed with several isolated repros) -- rAF sidesteps
+// that entirely and gives full control over the rise-then-orbit sequence.
 function playSunriseAnimation() {
   document.getElementById('sunrise-anim').classList.remove('hidden');
-  const motion = document.getElementById('sunrise-anim-motion');
-  if (motion && motion.beginElement) {
-    motion.beginElement();
+  if (sunriseAnimFrame) cancelAnimationFrame(sunriseAnimFrame);
+
+  const dot = document.getElementById('sunrise-anim-dot');
+  const glow = document.getElementById('sunrise-anim-glow');
+  const start = performance.now();
+
+  function tick(now) {
+    const elapsed = now - start;
+    let point;
+
+    if (elapsed < SUNRISE_ANIM_RISE_MS) {
+      point = sunriseRisePoint(easeInOutCubic(Math.min(elapsed / SUNRISE_ANIM_RISE_MS, 1)));
+      glow.setAttribute('opacity', '0');
+    } else {
+      const afterRise = elapsed - SUNRISE_ANIM_RISE_MS;
+      glow.setAttribute('opacity', String(Math.min(afterRise / SUNRISE_ANIM_GLOW_MS, 1) * 0.6));
+
+      // Orbits the peak like a lighthouse beam: a circle of radius
+      // SUNRISE_ANIM_ORBIT_RADIUS centered on (4,-18) -- the same point
+      // the glow sits on -- starting at (0,-18) (the rise's landing
+      // spot) so there's no jump when the orbit kicks in.
+      const orbitT = (afterRise % SUNRISE_ANIM_ORBIT_MS) / SUNRISE_ANIM_ORBIT_MS;
+      const angle = Math.PI + orbitT * Math.PI * 2;
+      point = {
+        x: 4 + SUNRISE_ANIM_ORBIT_RADIUS * Math.cos(angle),
+        y: -18 + SUNRISE_ANIM_ORBIT_RADIUS * Math.sin(angle),
+      };
+    }
+
+    dot.setAttribute('transform', `translate(${point.x},${point.y})`);
+    sunriseAnimFrame = requestAnimationFrame(tick);
   }
+
+  sunriseAnimFrame = requestAnimationFrame(tick);
 }
 
 function clearPosition() {
@@ -72,6 +130,10 @@ function clearPosition() {
   if (sunOverlay) sunOverlay.clear();
   document.getElementById('month-buttons-container').innerHTML = '';
   document.getElementById('sunrise-anim').classList.add('hidden');
+  if (sunriseAnimFrame) {
+    cancelAnimationFrame(sunriseAnimFrame);
+    sunriseAnimFrame = null;
+  }
   updateClearButtonVisibility();
 }
 
