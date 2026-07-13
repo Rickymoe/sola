@@ -49,6 +49,7 @@ function setPosition(lat, lng) {
   if (sunOverlay) sunOverlay.setMonthlyOverview(months);
   renderMonthTable(months);
   updateClearButtonVisibility();
+  updateTableToggleVisibility();
 }
 
 function clearPosition() {
@@ -60,10 +61,15 @@ function clearPosition() {
   if (sunOverlay) sunOverlay.clear();
   document.getElementById('month-table-container').innerHTML = '';
   updateClearButtonVisibility();
+  updateTableToggleVisibility();
 }
 
 function updateClearButtonVisibility() {
   document.getElementById('clear-position-btn').classList.toggle('hidden', !currentPosition);
+}
+
+function updateTableToggleVisibility() {
+  document.getElementById('table-toggle-btn').classList.toggle('hidden', !currentPosition);
 }
 
 function renderMonthTable(months) {
