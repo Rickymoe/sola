@@ -52,7 +52,23 @@ function setPosition(lat, lng) {
   renderMonthButtons();
   if (sunOverlay) sunOverlay.setMonth(months[selectedMonthIndex]);
   updateClearButtonVisibility();
+  updateTimezoneLabel(months[selectedMonthIndex]);
   playSunriseAnimation();
+}
+
+// Flags that the displayed times are the PINNED LOCATION's own local
+// time, not the viewer's -- otherwise e.g. "06:43" for a Miami pin looks
+// like an ordinary clock reading with no hint it isn't your own time.
+function updateTimezoneLabel(month) {
+  const label = document.getElementById('timezone-label');
+  const referenceDate = month.sunrise || month.sunset || new Date();
+  const offsetMin = Math.round(getUtcOffsetMinutes(referenceDate, month.timeZone));
+  const sign = offsetMin >= 0 ? '+' : '-';
+  const hours = Math.floor(Math.abs(offsetMin) / 60);
+  const mins = Math.abs(offsetMin) % 60;
+  const offsetStr = mins === 0 ? `${hours}` : `${hours}:${String(mins).padStart(2, '0')}`;
+  label.textContent = `Tider vist i stedets lokale tid (UTC${sign}${offsetStr})`;
+  label.classList.remove('hidden');
 }
 
 const SUNRISE_ANIM_RISE_MS = 1400;
@@ -129,6 +145,7 @@ function clearPosition() {
   months = null;
   if (sunOverlay) sunOverlay.clear();
   document.getElementById('month-buttons-container').innerHTML = '';
+  document.getElementById('timezone-label').classList.add('hidden');
   document.getElementById('sunrise-anim').classList.add('hidden');
   if (sunriseAnimFrame) {
     cancelAnimationFrame(sunriseAnimFrame);
@@ -162,6 +179,7 @@ function selectMonth(i) {
   }
   document.querySelectorAll('.month-btn')[i].classList.add('active');
   if (sunOverlay && months) sunOverlay.setMonth(months[i]);
+  if (months) updateTimezoneLabel(months[i]);
 }
 
 function setupLocationControls() {
