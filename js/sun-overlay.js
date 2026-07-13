@@ -189,8 +189,8 @@ function buildCompassLabels(center) {
   frame.setAttribute('cy', String(center.y));
   frame.setAttribute('r', String(labelRadius));
   frame.setAttribute('fill', 'none');
-  frame.setAttribute('stroke', '#fff');
-  frame.setAttribute('stroke-width', '4');
+  frame.setAttribute('stroke', '#e2574c');
+  frame.setAttribute('stroke-width', '6');
   g.appendChild(frame);
 
   directions.forEach(({ label }, i) => {
