@@ -107,7 +107,7 @@ function createSunPathOverlay() {
         const wedge = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         wedge.setAttribute('d', wedgeD);
         wedge.setAttribute('fill', this.month.color);
-        wedge.setAttribute('fill-opacity', '0.22');
+        wedge.setAttribute('fill-opacity', '0.45');
         wedge.setAttribute('stroke', 'none');
         this.svg.appendChild(wedge);
 
