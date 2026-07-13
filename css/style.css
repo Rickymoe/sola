@@ -16,7 +16,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 }
 
 #panel {
-  background: rgba(253, 246, 227, 0.95);
+  background: rgba(253, 251, 245, 0.95);
   backdrop-filter: blur(8px);
   border-radius: 12px;
   padding: 16px;
