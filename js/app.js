@@ -59,7 +59,6 @@ function clearPosition() {
   currentPosition = null;
   if (sunOverlay) sunOverlay.clear();
   document.getElementById('month-table-container').innerHTML = '';
-  document.getElementById('address-input').value = '';
   updateClearButtonVisibility();
 }
 
@@ -96,40 +95,9 @@ function setupTableToggle() {
   });
 }
 
-const ADDRESS_SEARCH_DEBOUNCE_MS = 300;
-let addressSearchTimer = null;
-
 function setupLocationControls() {
-  const input = document.getElementById('address-input');
-  const suggestions = document.getElementById('address-suggestions');
   const geolocateBtn = document.getElementById('geolocate-btn');
   const clearBtn = document.getElementById('clear-position-btn');
-
-  input.addEventListener('input', () => {
-    clearTimeout(addressSearchTimer);
-    const query = input.value.trim();
-    if (query.length < 3) {
-      suggestions.classList.add('hidden');
-      suggestions.innerHTML = '';
-      return;
-    }
-    addressSearchTimer = setTimeout(async () => {
-      let results;
-      try {
-        results = await searchAddresses(query);
-      } catch (err) {
-        suggestions.classList.add('hidden');
-        return;
-      }
-      renderAddressSuggestions(results);
-    }, ADDRESS_SEARCH_DEBOUNCE_MS);
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!suggestions.contains(e.target) && e.target !== input) {
-      suggestions.classList.add('hidden');
-    }
-  });
 
   geolocateBtn.addEventListener('click', () => {
     if (!navigator.geolocation) {
@@ -150,25 +118,5 @@ function setupLocationControls() {
   clearBtn.addEventListener('click', () => {
     clearPosition();
   });
-
-  function renderAddressSuggestions(results) {
-    suggestions.innerHTML = '';
-    if (results.length === 0) {
-      suggestions.classList.add('hidden');
-      return;
-    }
-    for (const r of results) {
-      const li = document.createElement('li');
-      li.textContent = r.label;
-      li.addEventListener('click', () => {
-        input.value = r.label;
-        suggestions.classList.add('hidden');
-        setPosition(r.lat, r.lon);
-        map.setZoom(16);
-      });
-      suggestions.appendChild(li);
-    }
-    suggestions.classList.remove('hidden');
-  }
 }
 

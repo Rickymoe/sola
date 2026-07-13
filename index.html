@@ -15,10 +15,18 @@
         <h2>Sola</h2>
       </div>
       <div id="panel-body">
-        <div class="field-group">
-          <label for="address-input">Søk adresse</label>
-          <input type="text" id="address-input" autocomplete="off" placeholder="F.eks. Kirkegata 1, Oslo" />
-          <ul id="address-suggestions" class="address-suggestions hidden"></ul>
+        <div class="icon-row">
+          <button id="geolocate-btn" class="icon-btn" aria-label="Bruk min posisjon" title="Bruk min posisjon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="3" fill="#4285f4" />
+              <path d="M12 2V5M12 19V22M2 12H5M19 12H22" stroke="#4285f4" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </button>
+          <button id="clear-position-btn" class="icon-btn hidden" aria-label="Fjern valgt punkt" title="Fjern valgt punkt">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 7H20M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" stroke="#5f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
         </div>
 
         <button id="table-toggle-btn" class="table-toggle" aria-expanded="true">
@@ -32,21 +40,7 @@
     </div>
   </div>
 
-  <button id="clear-position-btn" class="locate-fab clear-fab hidden" aria-label="Fjern valgt punkt" title="Fjern valgt punkt">
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M4 7H20M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" stroke="#5f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-    </svg>
-  </button>
-
-  <button id="geolocate-btn" class="locate-fab" aria-label="Bruk min posisjon" title="Bruk min posisjon">
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="12" cy="12" r="3" fill="#4285f4" />
-      <path d="M12 2V5M12 19V22M2 12H5M19 12H22" stroke="#4285f4" stroke-width="2" stroke-linecap="round" />
-    </svg>
-  </button>
-
   <script src="js/sunpath.js"></script>
-  <script src="js/address.js"></script>
   <script src="js/sun-year.js"></script>
   <script src="js/sun-overlay.js"></script>
   <script src="js/app.js"></script>
