@@ -16,6 +16,14 @@
 // whether anything constructs the class yet. Wrapping it in a function
 // defers that evaluation until createSunPathOverlay() is actually called
 // from initMap(), by which point google.maps genuinely exists.
+
+// Extra canvas space around the SUN_OVERLAY_SIZE circle so the
+// sunrise/sunset icons + time labels (drawn right at the rim, where the
+// arc starts/ends) have room to render without being clipped by the SVG's
+// own viewport.
+const SUN_OVERLAY_MARGIN = 34;
+const SUN_OVERLAY_CANVAS = SUN_OVERLAY_SIZE + SUN_OVERLAY_MARGIN * 2;
+
 function createSunPathOverlay() {
   class SunPathOverlay extends google.maps.OverlayView {
     constructor() {
@@ -29,14 +37,14 @@ function createSunPathOverlay() {
     onAdd() {
       this.div = document.createElement('div');
       this.div.style.position = 'absolute';
-      this.div.style.width = `${SUN_OVERLAY_SIZE}px`;
-      this.div.style.height = `${SUN_OVERLAY_SIZE}px`;
+      this.div.style.width = `${SUN_OVERLAY_CANVAS}px`;
+      this.div.style.height = `${SUN_OVERLAY_CANVAS}px`;
       this.div.style.pointerEvents = 'none';
       this.div.style.display = 'none';
 
       this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      this.svg.setAttribute('width', String(SUN_OVERLAY_SIZE));
-      this.svg.setAttribute('height', String(SUN_OVERLAY_SIZE));
+      this.svg.setAttribute('width', String(SUN_OVERLAY_CANVAS));
+      this.svg.setAttribute('height', String(SUN_OVERLAY_CANVAS));
       this.div.appendChild(this.svg);
 
       this.getPanes().overlayLayer.appendChild(this.div);
@@ -52,8 +60,8 @@ function createSunPathOverlay() {
         new google.maps.LatLng(this.position.lat, this.position.lng)
       );
       this.div.style.display = 'block';
-      this.div.style.left = `${point.x - SUN_OVERLAY_RADIUS}px`;
-      this.div.style.top = `${point.y - SUN_OVERLAY_RADIUS}px`;
+      this.div.style.left = `${point.x - SUN_OVERLAY_RADIUS - SUN_OVERLAY_MARGIN}px`;
+      this.div.style.top = `${point.y - SUN_OVERLAY_RADIUS - SUN_OVERLAY_MARGIN}px`;
     }
 
     onRemove() {
@@ -85,7 +93,11 @@ function createSunPathOverlay() {
       while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);
 
       if (this.month && this.month.points.length > 1) {
-        const pointsAttr = this.month.points.map((p) => `${p.x},${p.y}`).join(' ');
+        const offsetPoints = this.month.points.map((p) => ({
+          x: p.x + SUN_OVERLAY_MARGIN,
+          y: p.y + SUN_OVERLAY_MARGIN,
+        }));
+        const pointsAttr = offsetPoints.map((p) => `${p.x},${p.y}`).join(' ');
         // Layered strokes from wide/faint to thin/opaque fake a soft glow:
         // the color reads strong in the center of the arc and fades toward
         // its edges, rather than one flat-colored line.
@@ -106,18 +118,68 @@ function createSunPathOverlay() {
           path.setAttribute('opacity', String(layer.opacity));
           this.svg.appendChild(path);
         }
-      }
 
-      const rim = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      rim.setAttribute('cx', String(SUN_OVERLAY_RADIUS));
-      rim.setAttribute('cy', String(SUN_OVERLAY_RADIUS));
-      rim.setAttribute('r', String(SUN_OVERLAY_RADIUS - 2));
-      rim.setAttribute('fill', 'none');
-      rim.setAttribute('stroke', 'rgba(255,255,255,0.6)');
-      rim.setAttribute('stroke-width', '1');
-      this.svg.appendChild(rim);
+        this.svg.appendChild(buildSunMarker(offsetPoints[0], this.month.sunrise, true));
+        this.svg.appendChild(buildSunMarker(offsetPoints[offsetPoints.length - 1], this.month.sunset, false));
+      }
     }
   }
 
   return new SunPathOverlay();
+}
+
+// Builds a small sunrise/sunset marker (white backdrop + line-art sun icon
+// + time label) centered on one point (already offset for the overlay's
+// own margin). isSunrise flips the arrow direction and swaps in
+// "sunrise"/"sunset" for accessibility.
+function buildSunMarker(point, time, isSunrise) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('transform', `translate(${point.x}, ${point.y})`);
+
+  const backdrop = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  backdrop.setAttribute('r', '11');
+  backdrop.setAttribute('fill', '#fff');
+  backdrop.setAttribute('opacity', '0.9');
+  g.appendChild(backdrop);
+
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  icon.setAttribute('stroke', '#333');
+  icon.setAttribute('stroke-width', '1.3');
+  icon.setAttribute('stroke-linecap', 'round');
+  icon.setAttribute('stroke-linejoin', 'round');
+  icon.setAttribute('fill', 'none');
+
+  const horizon = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  horizon.setAttribute('x1', '-6');
+  horizon.setAttribute('y1', '3');
+  horizon.setAttribute('x2', '6');
+  horizon.setAttribute('y2', '3');
+  icon.appendChild(horizon);
+
+  const dome = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  dome.setAttribute('d', 'M-3.5 3a3.5 3.5 0 0 1 7 0');
+  icon.appendChild(dome);
+
+  // A gap is kept between the arrow and the dome's apex (y=-0.5) so the
+  // two read as separate shapes instead of merging into one triangle.
+  const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  arrow.setAttribute('d', isSunrise ? 'M0 -8V-2M-2 -5l2 -3 2 3' : 'M0 -8V-2M-2 -5l2 3 2 -3');
+  icon.appendChild(arrow);
+
+  g.appendChild(icon);
+
+  const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  text.setAttribute('x', '0');
+  text.setAttribute('y', '22');
+  text.setAttribute('text-anchor', 'middle');
+  text.setAttribute('font-size', '11');
+  text.setAttribute('font-weight', '600');
+  text.setAttribute('fill', '#333');
+  text.setAttribute('stroke', '#fff');
+  text.setAttribute('stroke-width', '3');
+  text.setAttribute('paint-order', 'stroke');
+  text.textContent = formatTime(time);
+  g.appendChild(text);
+
+  return g;
 }
