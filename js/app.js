@@ -45,7 +45,28 @@ function setPosition(lat, lng) {
   map.panTo({ lat, lng });
   updateSunReadout();
   if (sunOverlay) sunOverlay.setPosition(lat, lng);
-  if (sunOverlay) sunOverlay.setMonthlyOverview(getMonthlyOverview(lat, lng, currentDate.getFullYear()));
+  const months = getMonthlyOverview(lat, lng, currentDate.getFullYear());
+  if (sunOverlay) sunOverlay.setMonthlyOverview(months);
+  renderMonthTable(months);
+}
+
+function renderMonthTable(months) {
+  const container = document.getElementById('month-table-container');
+  const rows = months.map((mo) => `
+    <tr>
+      <td>${mo.name}</td>
+      <td>${formatTime(mo.sunrise)}</td>
+      <td>${formatTime(mo.sunset)}</td>
+    </tr>
+  `).join('');
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr><th>Måned</th><th>Opp</th><th>Ned</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
 }
 
 const ADDRESS_SEARCH_DEBOUNCE_MS = 300;

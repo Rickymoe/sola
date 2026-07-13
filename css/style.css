@@ -100,3 +100,23 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   flex-direction: column;
   gap: 4px;
 }
+
+#month-table-container table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+#month-table-container th,
+#month-table-container td {
+  padding: 3px 6px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+#month-table-container th {
+  font-size: 11px;
+  color: #666;
+  font-weight: 600;
+}
