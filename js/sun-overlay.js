@@ -98,6 +98,19 @@ function createSunPathOverlay() {
           y: p.y + SUN_OVERLAY_MARGIN,
         }));
         const pointsAttr = offsetPoints.map((p) => `${p.x},${p.y}`).join(' ');
+
+        // Filled wedge between the marker (center), the two horizon
+        // points, and the arc itself -- drawn first so the glow strokes
+        // and icons layer on top of it, not the other way round.
+        const center = { x: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN, y: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN };
+        const wedgeD = `M ${center.x},${center.y} L ${pointsAttr.split(' ').join(' L ')} Z`;
+        const wedge = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        wedge.setAttribute('d', wedgeD);
+        wedge.setAttribute('fill', this.month.color);
+        wedge.setAttribute('fill-opacity', '0.22');
+        wedge.setAttribute('stroke', 'none');
+        this.svg.appendChild(wedge);
+
         // Layered strokes from wide/faint to thin/opaque fake a soft glow:
         // the color reads strong in the center of the arc and fades toward
         // its edges, rather than one flat-colored line.
