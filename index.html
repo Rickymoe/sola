@@ -14,7 +14,15 @@
       <div class="panel-header">
         <h2>Sola</h2>
       </div>
-      <div id="panel-body"></div>
+      <div id="panel-body">
+        <div class="field-group">
+          <label for="address-input">Søk adresse</label>
+          <input type="text" id="address-input" autocomplete="off" placeholder="F.eks. Kirkegata 1, Oslo" />
+          <ul id="address-suggestions" class="address-suggestions hidden"></ul>
+        </div>
+
+        <button id="geolocate-btn" class="secondary-btn">📍 Bruk min posisjon</button>
+      </div>
     </div>
   </div>
 
