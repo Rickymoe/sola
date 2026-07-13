@@ -1,6 +1,7 @@
 let map;
 let marker;
 let currentPosition = null; // { lat, lng }
+let sunOverlay;
 
 const DEFAULT_CENTER = { lat: 59.9139, lng: 10.7522 }; // Oslo
 
@@ -19,6 +20,9 @@ function initMap() {
 
   setupLocationControls();
   setupDateTimeControls();
+
+  sunOverlay = createSunPathOverlay();
+  sunOverlay.setMap(map);
 }
 
 function setPosition(lat, lng) {
@@ -37,6 +41,7 @@ function setPosition(lat, lng) {
 
   map.panTo({ lat, lng });
   updateSunReadout();
+  if (sunOverlay) sunOverlay.setPosition(lat, lng);
 }
 
 const ADDRESS_SEARCH_DEBOUNCE_MS = 300;
@@ -134,6 +139,7 @@ function updateSunReadout() {
     readout.classList.add('hidden');
     return;
   }
+  if (sunOverlay) sunOverlay.setDate(currentDate);
   readout.classList.remove('hidden');
 
   const { azimuthDeg, altitudeDeg } = getSunPosition(currentDate, currentPosition.lat, currentPosition.lng);
