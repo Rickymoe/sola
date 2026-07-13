@@ -85,12 +85,27 @@ function createSunPathOverlay() {
       while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);
 
       if (this.month && this.month.points.length > 1) {
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-        path.setAttribute('points', this.month.points.map((p) => `${p.x},${p.y}`).join(' '));
-        path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', this.month.color);
-        path.setAttribute('stroke-width', '3');
-        this.svg.appendChild(path);
+        const pointsAttr = this.month.points.map((p) => `${p.x},${p.y}`).join(' ');
+        // Layered strokes from wide/faint to thin/opaque fake a soft glow:
+        // the color reads strong in the center of the arc and fades toward
+        // its edges, rather than one flat-colored line.
+        const GLOW_LAYERS = [
+          { width: 16, opacity: 0.12 },
+          { width: 10, opacity: 0.25 },
+          { width: 5, opacity: 0.55 },
+          { width: 2, opacity: 1 },
+        ];
+        for (const layer of GLOW_LAYERS) {
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+          path.setAttribute('points', pointsAttr);
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', this.month.color);
+          path.setAttribute('stroke-width', String(layer.width));
+          path.setAttribute('stroke-linecap', 'round');
+          path.setAttribute('stroke-linejoin', 'round');
+          path.setAttribute('opacity', String(layer.opacity));
+          this.svg.appendChild(path);
+        }
       }
 
       const rim = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
