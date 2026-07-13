@@ -21,7 +21,7 @@
 // sunrise/sunset icons + time labels (drawn right at the rim, where the
 // arc starts/ends) have room to render without being clipped by the SVG's
 // own viewport.
-const SUN_OVERLAY_MARGIN = 44;
+const SUN_OVERLAY_MARGIN = 52;
 const SUN_OVERLAY_CANVAS = SUN_OVERLAY_SIZE + SUN_OVERLAY_MARGIN * 2;
 
 function createSunPathOverlay() {
@@ -168,7 +168,7 @@ function buildCompassLabels(center) {
   defs.appendChild(filter);
   g.appendChild(defs);
 
-  const labelRadius = SUN_OVERLAY_RADIUS + 30;
+  const labelRadius = SUN_OVERLAY_RADIUS + 38;
   const directions = [
     { label: 'N', dx: 0, dy: -1 },
     { label: '\u00D8', dx: 1, dy: 0 },
@@ -226,10 +226,13 @@ function buildSunMarker(point, time, isSunrise) {
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('transform', `translate(${point.x}, ${point.y})`);
 
+  // Sunrise gets a cool gold backdrop, sunset a warmer coral one -- so
+  // the two badges read as distinct at a glance instead of looking
+  // like identical white circles (and distinct from the plain-white
+  // compass badges too).
   const backdrop = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
   backdrop.setAttribute('r', '11');
-  backdrop.setAttribute('fill', '#fff');
-  backdrop.setAttribute('opacity', '0.9');
+  backdrop.setAttribute('fill', isSunrise ? '#ffe29a' : '#ffab7a');
   g.appendChild(backdrop);
 
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'g');
