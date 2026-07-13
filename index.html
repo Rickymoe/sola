@@ -21,22 +21,17 @@
           <ul id="address-suggestions" class="address-suggestions hidden"></ul>
         </div>
 
-        <button id="geolocate-btn" class="secondary-btn">📍 Bruk min posisjon</button>
-
-        <div class="field-group">
-          <label for="datetime-input">Dato og klokkeslett</label>
-          <input type="datetime-local" id="datetime-input" />
-        </div>
-
-        <div id="sun-readout" class="sun-readout hidden">
-          <div><strong>Høyde:</strong> <span id="altitude-value">–</span>°</div>
-          <div><strong>Retning:</strong> <span id="azimuth-value">–</span>°</div>
-        </div>
-
         <div id="month-table-container"></div>
       </div>
     </div>
   </div>
+
+  <button id="geolocate-btn" class="locate-fab" aria-label="Bruk min posisjon" title="Bruk min posisjon">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="12" cy="12" r="3" fill="#4285f4" />
+      <path d="M12 2V5M12 19V22M2 12H5M19 12H22" stroke="#4285f4" stroke-width="2" stroke-linecap="round" />
+    </svg>
+  </button>
 
   <script src="js/sunpath.js"></script>
   <script src="js/address.js"></script>

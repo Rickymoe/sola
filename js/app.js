@@ -22,7 +22,6 @@ function initMap() {
   });
 
   setupLocationControls();
-  setupDateTimeControls();
 
   sunOverlay = createSunPathOverlay();
   sunOverlay.setMap(map);
@@ -43,9 +42,9 @@ function setPosition(lat, lng) {
   });
 
   map.panTo({ lat, lng });
-  updateSunReadout();
   if (sunOverlay) sunOverlay.setPosition(lat, lng);
-  const months = getMonthlyOverview(lat, lng, currentDate.getFullYear());
+  if (sunOverlay) sunOverlay.setDate(new Date());
+  const months = getMonthlyOverview(lat, lng, new Date().getFullYear());
   if (sunOverlay) sunOverlay.setMonthlyOverview(months);
   renderMonthTable(months);
 }
@@ -140,34 +139,3 @@ function setupLocationControls() {
   }
 }
 
-let currentDate = new Date();
-
-function formatDatetimeLocal(date) {
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function setupDateTimeControls() {
-  const input = document.getElementById('datetime-input');
-  input.value = formatDatetimeLocal(currentDate);
-
-  input.addEventListener('input', () => {
-    if (!input.value) return;
-    currentDate = new Date(input.value);
-    updateSunReadout();
-  });
-}
-
-function updateSunReadout() {
-  const readout = document.getElementById('sun-readout');
-  if (!currentPosition) {
-    readout.classList.add('hidden');
-    return;
-  }
-  if (sunOverlay) sunOverlay.setDate(currentDate);
-  readout.classList.remove('hidden');
-
-  const { azimuthDeg, altitudeDeg } = getSunPosition(currentDate, currentPosition.lat, currentPosition.lng);
-  document.getElementById('altitude-value').textContent = altitudeDeg.toFixed(1);
-  document.getElementById('azimuth-value').textContent = azimuthDeg.toFixed(1);
-}

@@ -76,29 +76,30 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
 .hidden { display: none !important; }
 
-.secondary-btn {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  background: white;
-  font-size: 14px;
+.locate-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  z-index: 10;
 }
 
-.secondary-btn:hover {
+.locate-fab:hover {
   background: #f5f5f5;
 }
 
-.sun-readout {
-  background: #fff8e1;
-  border: 1px solid #ffe082;
-  border-radius: 6px;
-  padding: 10px;
-  font-size: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.locate-fab svg {
+  width: 22px;
+  height: 22px;
 }
 
 #month-table-container table {
