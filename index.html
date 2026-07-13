@@ -13,9 +13,18 @@
     <div id="panel">
       <div class="panel-header">
         <h2>Sola</h2>
-        <svg class="sunrise-anim" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+        <svg id="sunrise-anim" class="sunrise-anim hidden" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
           <line x1="4" y1="26" x2="28" y2="26" stroke="#ccc" stroke-width="2" stroke-linecap="round" />
           <g transform="translate(16,26)">
+            <circle r="10" fill="#ffd166" opacity="0">
+              <animate
+                attributeName="opacity"
+                to="0.6"
+                dur="0.6s"
+                begin="sunrise-anim-motion.end"
+                fill="freeze"
+              />
+            </circle>
             <circle r="5" fill="#ffb703" />
             <animateMotion
               id="sunrise-anim-motion"

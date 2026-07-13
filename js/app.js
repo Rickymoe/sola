@@ -55,6 +55,7 @@ function setPosition(lat, lng) {
 }
 
 function playSunriseAnimation() {
+  document.getElementById('sunrise-anim').classList.remove('hidden');
   const motion = document.getElementById('sunrise-anim-motion');
   if (motion && motion.beginElement) {
     motion.beginElement();
@@ -70,6 +71,7 @@ function clearPosition() {
   months = null;
   if (sunOverlay) sunOverlay.clear();
   document.getElementById('month-buttons-container').innerHTML = '';
+  document.getElementById('sunrise-anim').classList.add('hidden');
   updateClearButtonVisibility();
 }
 
