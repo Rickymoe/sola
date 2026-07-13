@@ -1,7 +1,3 @@
-const SUN_OVERLAY_SIZE = 240; // px, diameter of the drawn circle
-const SUN_OVERLAY_RADIUS = SUN_OVERLAY_SIZE / 2;
-const SUN_SAMPLE_STEP_MINUTES = 10;
-
 // Renders the sun's path across the sky for the current date as a
 // polar-style overlay centered on the observer's marker: angle = azimuth
 // (0°=north, clockwise), radius = altitude mapped so 90° (zenith) is the
@@ -28,6 +24,7 @@ function createSunPathOverlay() {
       this.svg = null;
       this.position = null; // { lat, lng }
       this.date = new Date();
+      this.monthlyOverview = null; // array of 12 { name, points, sunrise, sunset, dayLengthMs, color }, set via setMonthlyOverview()
     }
 
     onAdd() {
@@ -78,22 +75,35 @@ function createSunPathOverlay() {
       this.render();
     }
 
+    setMonthlyOverview(months) {
+      this.monthlyOverview = months;
+      this.render();
+    }
+
     render() {
       if (!this.svg || !this.position) return;
       while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);
 
       const { lat, lng } = this.position;
-      const dayStart = new Date(this.date);
-      dayStart.setHours(0, 0, 0, 0);
 
-      const points = [];
-      for (let m = 0; m <= 24 * 60; m += SUN_SAMPLE_STEP_MINUTES) {
-        const t = new Date(dayStart.getTime() + m * 60000);
-        const { azimuthDeg, altitudeDeg } = getSunPosition(t, lat, lng);
-        if (altitudeDeg < 0) continue;
-        points.push(sunPolarToXY(azimuthDeg, altitudeDeg));
+      // The 12 monthly arcs are drawn FIRST (thinner, more transparent, no
+      // fill) so the single selected-date arc drawn afterward visually
+      // stands out on top of them, not buried under 12 other lines.
+      if (this.monthlyOverview) {
+        for (const month of this.monthlyOverview) {
+          if (month.points.length > 1) {
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+            path.setAttribute('points', month.points.map((p) => `${p.x},${p.y}`).join(' '));
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', month.color);
+            path.setAttribute('stroke-width', '1.5');
+            path.setAttribute('opacity', '0.6');
+            this.svg.appendChild(path);
+          }
+        }
       }
 
+      const { points } = sampleDayArc(this.date, lat, lng);
       if (points.length > 1) {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
         path.setAttribute('points', points.map((p) => `${p.x},${p.y}`).join(' '));
@@ -101,19 +111,6 @@ function createSunPathOverlay() {
         path.setAttribute('stroke', '#ffb703');
         path.setAttribute('stroke-width', '3');
         this.svg.appendChild(path);
-      }
-
-      const current = getSunPosition(this.date, lat, lng);
-      if (current.altitudeDeg >= 0) {
-        const p = sunPolarToXY(current.azimuthDeg, current.altitudeDeg);
-        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        dot.setAttribute('cx', String(p.x));
-        dot.setAttribute('cy', String(p.y));
-        dot.setAttribute('r', '6');
-        dot.setAttribute('fill', '#ff9800');
-        dot.setAttribute('stroke', '#fff');
-        dot.setAttribute('stroke-width', '2');
-        this.svg.appendChild(dot);
       }
 
       const rim = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -128,13 +125,4 @@ function createSunPathOverlay() {
   }
 
   return new SunPathOverlay();
-}
-
-function sunPolarToXY(azimuthDeg, altitudeDeg) {
-  const r = SUN_OVERLAY_RADIUS * (1 - Math.min(altitudeDeg, 90) / 90);
-  const azimuthRad = (azimuthDeg * Math.PI) / 180;
-  return {
-    x: SUN_OVERLAY_RADIUS + r * Math.sin(azimuthRad),
-    y: SUN_OVERLAY_RADIUS - r * Math.cos(azimuthRad),
-  };
 }

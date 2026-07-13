@@ -45,6 +45,7 @@ function setPosition(lat, lng) {
   map.panTo({ lat, lng });
   updateSunReadout();
   if (sunOverlay) sunOverlay.setPosition(lat, lng);
+  if (sunOverlay) sunOverlay.setMonthlyOverview(getMonthlyOverview(lat, lng, currentDate.getFullYear()));
 }
 
 const ADDRESS_SEARCH_DEBOUNCE_MS = 300;
