@@ -13,6 +13,8 @@ function initMap() {
     mapTypeControl: false,
     streetViewControl: false,
     zoomControl: false,
+    fullscreenControl: false,
+    rotateControl: false,
     disableDefaultUI: false,
     mapId: 'DEMO_MAP_ID',
   });
