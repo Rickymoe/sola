@@ -168,7 +168,6 @@ function buildCompassLabels(center) {
   defs.appendChild(filter);
   g.appendChild(defs);
 
-  const rimRadius = SUN_OVERLAY_RADIUS;
   const labelRadius = SUN_OVERLAY_RADIUS + 20;
   const directions = [
     { label: 'N', dx: 0, dy: -1 },
@@ -176,21 +175,23 @@ function buildCompassLabels(center) {
     { label: 'S', dx: 0, dy: 1 },
     { label: 'V', dx: -1, dy: 0 },
   ];
-  for (const { label, dx, dy } of directions) {
-    const x = center.x + dx * labelRadius;
-    const y = center.y + dy * labelRadius;
+  const points = directions.map(({ dx, dy }) => ({
+    x: center.x + dx * labelRadius,
+    y: center.y + dy * labelRadius,
+  }));
 
-    // A thin spoke connects the rim to the floating badge, running
-    // straight through its center -- ties the badge visually back to
-    // the sun-path circle instead of leaving it adrift on the map.
-    const spoke = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    spoke.setAttribute('x1', String(center.x + dx * rimRadius));
-    spoke.setAttribute('y1', String(center.y + dy * rimRadius));
-    spoke.setAttribute('x2', String(x + dx * 10));
-    spoke.setAttribute('y2', String(y + dy * 10));
-    spoke.setAttribute('stroke', '#fff');
-    spoke.setAttribute('stroke-width', '2');
-    g.appendChild(spoke);
+  // A thin white frame runs N -> \u00D8 -> S -> V -> N, tying the four
+  // floating badges together into one compass rose instead of leaving
+  // each adrift on its own.
+  const frame = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  frame.setAttribute('points', points.map((p) => `${p.x},${p.y}`).join(' '));
+  frame.setAttribute('fill', 'none');
+  frame.setAttribute('stroke', '#fff');
+  frame.setAttribute('stroke-width', '2');
+  g.appendChild(frame);
+
+  directions.forEach(({ label }, i) => {
+    const { x, y } = points[i];
 
     const backdrop = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     backdrop.setAttribute('cx', String(x));
@@ -210,7 +211,7 @@ function buildCompassLabels(center) {
     text.setAttribute('fill', '#333');
     text.textContent = label;
     g.appendChild(text);
-  }
+  });
   return g;
 }
 
