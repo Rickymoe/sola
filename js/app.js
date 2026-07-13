@@ -10,6 +10,8 @@ function initMap() {
     center: DEFAULT_CENTER,
     zoom: 14,
     mapTypeId: 'satellite',
+    mapTypeControl: false,
+    streetViewControl: false,
     disableDefaultUI: false,
     mapId: 'DEMO_MAP_ID',
   });
@@ -32,7 +34,7 @@ function setPosition(lat, lng) {
     marker.map = null;
   }
   const dot = document.createElement('div');
-  dot.style.cssText = 'width:16px;height:16px;border-radius:50%;background:#ff9800;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)';
+  dot.style.cssText = 'width:16px;height:16px;border-radius:50%;background:#4285f4;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)';
   marker = new google.maps.marker.AdvancedMarkerElement({
     position: { lat, lng },
     map,
