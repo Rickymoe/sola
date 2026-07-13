@@ -21,7 +21,7 @@
 // sunrise/sunset icons + time labels (drawn right at the rim, where the
 // arc starts/ends) have room to render without being clipped by the SVG's
 // own viewport.
-const SUN_OVERLAY_MARGIN = 34;
+const SUN_OVERLAY_MARGIN = 44;
 const SUN_OVERLAY_CANVAS = SUN_OVERLAY_SIZE + SUN_OVERLAY_MARGIN * 2;
 
 function createSunPathOverlay() {
@@ -168,7 +168,7 @@ function buildCompassLabels(center) {
   defs.appendChild(filter);
   g.appendChild(defs);
 
-  const labelRadius = SUN_OVERLAY_RADIUS + 20;
+  const labelRadius = SUN_OVERLAY_RADIUS + 30;
   const directions = [
     { label: 'N', dx: 0, dy: -1 },
     { label: '\u00D8', dx: 1, dy: 0 },
@@ -180,11 +180,14 @@ function buildCompassLabels(center) {
     y: center.y + dy * labelRadius,
   }));
 
-  // A thin white frame runs N -> \u00D8 -> S -> V -> N, tying the four
-  // floating badges together into one compass rose instead of leaving
-  // each adrift on its own.
-  const frame = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-  frame.setAttribute('points', points.map((p) => `${p.x},${p.y}`).join(' '));
+  // A thin white ring through N/\u00D8/S/V ties the four floating badges
+  // together into one compass rose instead of leaving each adrift on
+  // its own -- a circle (not a straight-edged polygon) since all four
+  // sit at the same radius anyway, so it reads as a curved compass ring.
+  const frame = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  frame.setAttribute('cx', String(center.x));
+  frame.setAttribute('cy', String(center.y));
+  frame.setAttribute('r', String(labelRadius));
   frame.setAttribute('fill', 'none');
   frame.setAttribute('stroke', '#fff');
   frame.setAttribute('stroke-width', '2');
