@@ -80,6 +80,12 @@ function createSunPathOverlay() {
       this.render();
     }
 
+    clear() {
+      this.position = null;
+      this.monthlyOverview = null;
+      if (this.div) this.div.style.display = 'none';
+    }
+
     render() {
       if (!this.svg || !this.position) return;
       while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);

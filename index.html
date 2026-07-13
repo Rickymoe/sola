@@ -21,10 +21,22 @@
           <ul id="address-suggestions" class="address-suggestions hidden"></ul>
         </div>
 
+        <button id="table-toggle-btn" class="table-toggle" aria-expanded="true">
+          <span>Sol-tabell</span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 9l6 6 6-6" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
         <div id="month-table-container"></div>
       </div>
     </div>
   </div>
+
+  <button id="clear-position-btn" class="locate-fab clear-fab hidden" aria-label="Fjern valgt punkt" title="Fjern valgt punkt">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 7H20M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" stroke="#5f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </button>
 
   <button id="geolocate-btn" class="locate-fab" aria-label="Bruk min posisjon" title="Bruk min posisjon">
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

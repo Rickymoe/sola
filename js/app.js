@@ -22,6 +22,7 @@ function initMap() {
   });
 
   setupLocationControls();
+  setupTableToggle();
 
   sunOverlay = createSunPathOverlay();
   sunOverlay.setMap(map);
@@ -47,6 +48,23 @@ function setPosition(lat, lng) {
   const months = getMonthlyOverview(lat, lng, new Date().getFullYear());
   if (sunOverlay) sunOverlay.setMonthlyOverview(months);
   renderMonthTable(months);
+  updateClearButtonVisibility();
+}
+
+function clearPosition() {
+  if (marker) {
+    marker.map = null;
+    marker = null;
+  }
+  currentPosition = null;
+  if (sunOverlay) sunOverlay.clear();
+  document.getElementById('month-table-container').innerHTML = '';
+  document.getElementById('address-input').value = '';
+  updateClearButtonVisibility();
+}
+
+function updateClearButtonVisibility() {
+  document.getElementById('clear-position-btn').classList.toggle('hidden', !currentPosition);
 }
 
 function renderMonthTable(months) {
@@ -68,6 +86,16 @@ function renderMonthTable(months) {
   `;
 }
 
+function setupTableToggle() {
+  const toggleBtn = document.getElementById('table-toggle-btn');
+  const container = document.getElementById('month-table-container');
+
+  toggleBtn.addEventListener('click', () => {
+    const collapsed = container.classList.toggle('collapsed');
+    toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+  });
+}
+
 const ADDRESS_SEARCH_DEBOUNCE_MS = 300;
 let addressSearchTimer = null;
 
@@ -75,6 +103,7 @@ function setupLocationControls() {
   const input = document.getElementById('address-input');
   const suggestions = document.getElementById('address-suggestions');
   const geolocateBtn = document.getElementById('geolocate-btn');
+  const clearBtn = document.getElementById('clear-position-btn');
 
   input.addEventListener('input', () => {
     clearTimeout(addressSearchTimer);
@@ -116,6 +145,10 @@ function setupLocationControls() {
         alert('Fikk ikke tilgang til posisjonen din.');
       }
     );
+  });
+
+  clearBtn.addEventListener('click', () => {
+    clearPosition();
   });
 
   function renderAddressSuggestions(results) {

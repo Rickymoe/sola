@@ -102,6 +102,39 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   height: 22px;
 }
 
+.clear-fab {
+  right: 76px;
+}
+
+.table-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  border-top: 1px solid #eee;
+  padding: 8px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+}
+
+.table-toggle .chevron {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s;
+}
+
+.table-toggle[aria-expanded="false"] .chevron {
+  transform: rotate(-90deg);
+}
+
+#month-table-container.collapsed {
+  display: none;
+}
+
 #month-table-container table {
   width: 100%;
   border-collapse: collapse;
