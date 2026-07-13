@@ -92,6 +92,9 @@ function createSunPathOverlay() {
       if (!this.svg || !this.position) return;
       while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);
 
+      const center = { x: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN, y: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN };
+      this.svg.appendChild(buildCompassLabels(center));
+
       if (this.month && this.month.points.length > 1) {
         const offsetPoints = this.month.points.map((p) => ({
           x: p.x + SUN_OVERLAY_MARGIN,
@@ -102,7 +105,6 @@ function createSunPathOverlay() {
         // Filled wedge between the marker (center), the two horizon
         // points, and the arc itself -- drawn first so the glow strokes
         // and icons layer on top of it, not the other way round.
-        const center = { x: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN, y: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN };
         const wedgeD = `M ${center.x},${center.y} L ${pointsAttr.split(' ').join(' L ')} Z`;
         const wedge = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         wedge.setAttribute('d', wedgeD);
@@ -139,6 +141,36 @@ function createSunPathOverlay() {
   }
 
   return new SunPathOverlay();
+}
+
+// Builds the N/Ø/S/V compass labels around the rim, matching the same
+// azimuth mapping as sunPolarToXY (0°=north=top, clockwise) so a label's
+// position always lines up with the direction it names.
+function buildCompassLabels(center) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const labelRadius = SUN_OVERLAY_RADIUS + 14;
+  const directions = [
+    { label: 'N', dx: 0, dy: -1 },
+    { label: '\u00D8', dx: 1, dy: 0 },
+    { label: 'S', dx: 0, dy: 1 },
+    { label: 'V', dx: -1, dy: 0 },
+  ];
+  for (const { label, dx, dy } of directions) {
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', String(center.x + dx * labelRadius));
+    text.setAttribute('y', String(center.y + dy * labelRadius));
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('font-size', '12');
+    text.setAttribute('font-weight', '600');
+    text.setAttribute('fill', '#555');
+    text.setAttribute('stroke', '#fff');
+    text.setAttribute('stroke-width', '3');
+    text.setAttribute('paint-order', 'stroke');
+    text.textContent = label;
+    g.appendChild(text);
+  }
+  return g;
 }
 
 // Builds a small sunrise/sunset marker (white backdrop + line-art sun icon
