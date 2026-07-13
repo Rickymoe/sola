@@ -156,17 +156,25 @@ function buildCompassLabels(center) {
     { label: 'V', dx: -1, dy: 0 },
   ];
   for (const { label, dx, dy } of directions) {
+    const x = center.x + dx * labelRadius;
+    const y = center.y + dy * labelRadius;
+
+    const backdrop = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    backdrop.setAttribute('cx', String(x));
+    backdrop.setAttribute('cy', String(y));
+    backdrop.setAttribute('r', '10');
+    backdrop.setAttribute('fill', '#fff');
+    backdrop.setAttribute('opacity', '0.85');
+    g.appendChild(backdrop);
+
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', String(center.x + dx * labelRadius));
-    text.setAttribute('y', String(center.y + dy * labelRadius));
+    text.setAttribute('x', String(x));
+    text.setAttribute('y', String(y));
     text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('dominant-baseline', 'middle');
-    text.setAttribute('font-size', '12');
-    text.setAttribute('font-weight', '600');
-    text.setAttribute('fill', '#555');
-    text.setAttribute('stroke', '#fff');
-    text.setAttribute('stroke-width', '3');
-    text.setAttribute('paint-order', 'stroke');
+    text.setAttribute('dominant-baseline', 'central');
+    text.setAttribute('font-size', '16');
+    text.setAttribute('font-weight', '700');
+    text.setAttribute('fill', '#333');
     text.textContent = label;
     g.appendChild(text);
   }
