@@ -18,6 +18,7 @@ function initMap() {
   });
 
   setupLocationControls();
+  setupDateTimeControls();
 }
 
 function setPosition(lat, lng) {
@@ -35,6 +36,7 @@ function setPosition(lat, lng) {
   });
 
   map.panTo({ lat, lng });
+  updateSunReadout();
 }
 
 const ADDRESS_SEARCH_DEBOUNCE_MS = 300;
@@ -106,4 +108,35 @@ function setupLocationControls() {
     }
     suggestions.classList.remove('hidden');
   }
+}
+
+let currentDate = new Date();
+
+function formatDatetimeLocal(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function setupDateTimeControls() {
+  const input = document.getElementById('datetime-input');
+  input.value = formatDatetimeLocal(currentDate);
+
+  input.addEventListener('input', () => {
+    if (!input.value) return;
+    currentDate = new Date(input.value);
+    updateSunReadout();
+  });
+}
+
+function updateSunReadout() {
+  const readout = document.getElementById('sun-readout');
+  if (!currentPosition) {
+    readout.classList.add('hidden');
+    return;
+  }
+  readout.classList.remove('hidden');
+
+  const { azimuthDeg, altitudeDeg } = getSunPosition(currentDate, currentPosition.lat, currentPosition.lng);
+  document.getElementById('altitude-value').textContent = altitudeDeg.toFixed(1);
+  document.getElementById('azimuth-value').textContent = azimuthDeg.toFixed(1);
 }
