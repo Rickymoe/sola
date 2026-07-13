@@ -76,6 +76,7 @@ function renderMonthButtons() {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'month-btn' + (i === selectedMonthIndex ? ' active' : '');
+    btn.style.backgroundColor = mo.color;
     btn.textContent = mo.name;
     btn.addEventListener('click', () => selectMonth(i));
     container.appendChild(btn);
