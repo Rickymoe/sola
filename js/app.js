@@ -12,6 +12,7 @@ function initMap() {
     mapTypeId: 'satellite',
     mapTypeControl: false,
     streetViewControl: false,
+    zoomControl: false,
     disableDefaultUI: false,
     mapId: 'DEMO_MAP_ID',
   });
