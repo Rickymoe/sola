@@ -13,6 +13,22 @@
     <div id="panel">
       <div class="panel-header">
         <h2>Sola</h2>
+        <svg class="sunrise-anim" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+          <line x1="4" y1="26" x2="28" y2="26" stroke="#ccc" stroke-width="2" stroke-linecap="round" />
+          <g transform="translate(16,26)">
+            <circle r="5" fill="#ffb703" />
+            <animateMotion
+              id="sunrise-anim-motion"
+              path="M 0,0 Q -8,-10 0,-18"
+              dur="1.4s"
+              begin="indefinite"
+              fill="freeze"
+              calcMode="spline"
+              keyTimes="0;1"
+              keySplines="0.4 0 0.2 1"
+            />
+          </g>
+        </svg>
       </div>
       <div id="panel-body">
         <div class="icon-row">

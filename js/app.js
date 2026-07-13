@@ -51,6 +51,14 @@ function setPosition(lat, lng) {
   renderMonthButtons();
   if (sunOverlay) sunOverlay.setMonth(months[selectedMonthIndex]);
   updateClearButtonVisibility();
+  playSunriseAnimation();
+}
+
+function playSunriseAnimation() {
+  const motion = document.getElementById('sunrise-anim-motion');
+  if (motion && motion.beginElement) {
+    motion.beginElement();
+  }
 }
 
 function clearPosition() {
