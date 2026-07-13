@@ -23,8 +23,7 @@ function createSunPathOverlay() {
       this.div = null;
       this.svg = null;
       this.position = null; // { lat, lng }
-      this.date = new Date();
-      this.monthlyOverview = null; // array of 12 { name, points, sunrise, sunset, dayLengthMs, color }, set via setMonthlyOverview()
+      this.month = null; // { name, points, sunrise, sunset, dayLengthMs, color }, set via setMonth()
     }
 
     onAdd() {
@@ -70,19 +69,14 @@ function createSunPathOverlay() {
       this.render();
     }
 
-    setDate(date) {
-      this.date = date;
-      this.render();
-    }
-
-    setMonthlyOverview(months) {
-      this.monthlyOverview = months;
+    setMonth(month) {
+      this.month = month;
       this.render();
     }
 
     clear() {
       this.position = null;
-      this.monthlyOverview = null;
+      this.month = null;
       if (this.div) this.div.style.display = 'none';
     }
 
@@ -90,31 +84,11 @@ function createSunPathOverlay() {
       if (!this.svg || !this.position) return;
       while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);
 
-      const { lat, lng } = this.position;
-
-      // The 12 monthly arcs are drawn FIRST (thinner, more transparent, no
-      // fill) so the single selected-date arc drawn afterward visually
-      // stands out on top of them, not buried under 12 other lines.
-      if (this.monthlyOverview) {
-        for (const month of this.monthlyOverview) {
-          if (month.points.length > 1) {
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-            path.setAttribute('points', month.points.map((p) => `${p.x},${p.y}`).join(' '));
-            path.setAttribute('fill', 'none');
-            path.setAttribute('stroke', month.color);
-            path.setAttribute('stroke-width', '1.5');
-            path.setAttribute('opacity', '0.6');
-            this.svg.appendChild(path);
-          }
-        }
-      }
-
-      const { points } = sampleDayArc(this.date, lat, lng);
-      if (points.length > 1) {
+      if (this.month && this.month.points.length > 1) {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-        path.setAttribute('points', points.map((p) => `${p.x},${p.y}`).join(' '));
+        path.setAttribute('points', this.month.points.map((p) => `${p.x},${p.y}`).join(' '));
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', '#ffb703');
+        path.setAttribute('stroke', this.month.color);
         path.setAttribute('stroke-width', '3');
         this.svg.appendChild(path);
       }

@@ -58,51 +58,29 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   height: 22px;
 }
 
-.table-toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: none;
-  border: none;
-  border-top: 1px solid #eee;
-  padding: 8px 0 4px;
-  font-size: 13px;
-  font-weight: 600;
+.month-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.month-btn {
+  padding: 6px 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
   color: #333;
   cursor: pointer;
+  text-align: center;
 }
 
-.table-toggle .chevron {
-  width: 16px;
-  height: 16px;
-  transition: transform 0.2s;
+.month-btn:hover {
+  background: #f5f5f5;
 }
 
-.table-toggle[aria-expanded="false"] .chevron {
-  transform: rotate(-90deg);
-}
-
-#month-table-container.collapsed {
-  display: none;
-}
-
-#month-table-container table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  margin-top: 8px;
-}
-
-#month-table-container th,
-#month-table-container td {
-  padding: 3px 6px;
-  text-align: left;
-  border-bottom: 1px solid #eee;
-}
-
-#month-table-container th {
-  font-size: 11px;
-  color: #666;
-  font-weight: 600;
+.month-btn.active {
+  background: #4285f4;
+  border-color: #4285f4;
+  color: #fff;
 }

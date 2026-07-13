@@ -2,6 +2,8 @@ let map;
 let marker;
 let currentPosition = null; // { lat, lng }
 let sunOverlay;
+let months = null; // array of 12 { name, points, sunrise, sunset, dayLengthMs, color }
+let selectedMonthIndex = new Date().getMonth();
 
 const DEFAULT_CENTER = { lat: 59.9139, lng: 10.7522 }; // Oslo
 
@@ -24,7 +26,6 @@ function initMap() {
   });
 
   setupLocationControls();
-  setupTableToggle();
 
   sunOverlay = createSunPathOverlay();
   sunOverlay.setMap(map);
@@ -46,12 +47,10 @@ function setPosition(lat, lng) {
 
   map.panTo({ lat, lng });
   if (sunOverlay) sunOverlay.setPosition(lat, lng);
-  if (sunOverlay) sunOverlay.setDate(new Date());
-  const months = getMonthlyOverview(lat, lng, new Date().getFullYear());
-  if (sunOverlay) sunOverlay.setMonthlyOverview(months);
-  renderMonthTable(months);
+  months = getMonthlyOverview(lat, lng, new Date().getFullYear());
+  renderMonthButtons();
+  if (sunOverlay) sunOverlay.setMonth(months[selectedMonthIndex]);
   updateClearButtonVisibility();
-  updateTableToggleVisibility();
 }
 
 function clearPosition() {
@@ -60,47 +59,36 @@ function clearPosition() {
     marker = null;
   }
   currentPosition = null;
+  months = null;
   if (sunOverlay) sunOverlay.clear();
-  document.getElementById('month-table-container').innerHTML = '';
+  document.getElementById('month-buttons-container').innerHTML = '';
   updateClearButtonVisibility();
-  updateTableToggleVisibility();
 }
 
 function updateClearButtonVisibility() {
   document.getElementById('clear-position-btn').classList.toggle('hidden', !currentPosition);
 }
 
-function updateTableToggleVisibility() {
-  document.getElementById('table-toggle-btn').classList.toggle('hidden', !currentPosition);
-}
-
-function renderMonthTable(months) {
-  const container = document.getElementById('month-table-container');
-  const rows = months.map((mo) => `
-    <tr>
-      <td>${mo.name}</td>
-      <td>${formatTime(mo.sunrise)}</td>
-      <td>${formatTime(mo.sunset)}</td>
-    </tr>
-  `).join('');
-  container.innerHTML = `
-    <table>
-      <thead>
-        <tr><th>Måned</th><th>Opp</th><th>Ned</th></tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
-}
-
-function setupTableToggle() {
-  const toggleBtn = document.getElementById('table-toggle-btn');
-  const container = document.getElementById('month-table-container');
-
-  toggleBtn.addEventListener('click', () => {
-    const collapsed = container.classList.toggle('collapsed');
-    toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+function renderMonthButtons() {
+  const container = document.getElementById('month-buttons-container');
+  container.innerHTML = '';
+  months.forEach((mo, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'month-btn' + (i === selectedMonthIndex ? ' active' : '');
+    btn.textContent = mo.name;
+    btn.addEventListener('click', () => selectMonth(i));
+    container.appendChild(btn);
   });
+}
+
+function selectMonth(i) {
+  selectedMonthIndex = i;
+  for (const btn of document.querySelectorAll('.month-btn')) {
+    btn.classList.remove('active');
+  }
+  document.querySelectorAll('.month-btn')[i].classList.add('active');
+  if (sunOverlay && months) sunOverlay.setMonth(months[i]);
 }
 
 function setupLocationControls() {
