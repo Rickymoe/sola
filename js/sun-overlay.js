@@ -254,6 +254,10 @@ function buildCompassLabels(center) {
 // never overlaps the N/Ø/S/V ring.
 const HEADING_ARROW_LENGTH = SUN_OVERLAY_RADIUS - 15;
 
+// Same blue as the pinned-location dot (js/app.js's marker, #4285f4) so the
+// needle reads as "an extension of that dot" rather than a competing color.
+const HEADING_ARROW_COLOR = '#4285f4';
+
 // Draws a compass-needle-style pointer from the overlay's center,
 // rotated to headingDeg (0=north=top, clockwise -- the same azimuth
 // convention buildCompassLabels and the sun-path arc already use).
@@ -265,6 +269,11 @@ const HEADING_ARROW_LENGTH = SUN_OVERLAY_RADIUS - 15;
 function buildHeadingArrow(center, headingDeg) {
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('transform', `rotate(${headingDeg}, ${center.x}, ${center.y})`);
+  // Reuses buildCompassLabels' own drop-shadow filter (already defined in
+  // the SVG by the time this renders) so the needle floats above busy
+  // satellite-map detail the same way the N/Ø/S/V badges already do,
+  // instead of blending into whatever's underneath it.
+  g.setAttribute('filter', 'url(#compass-shadow)');
 
   // Short grey tail pointing opposite the heading, so the needle reads
   // as "pivoting around the center" rather than "starting from nothing."
@@ -284,14 +293,14 @@ function buildHeadingArrow(center, headingDeg) {
   shaft.setAttribute('y1', String(center.y));
   shaft.setAttribute('x2', String(center.x));
   shaft.setAttribute('y2', String(shaftTipY));
-  shaft.setAttribute('stroke', '#e2574c');
+  shaft.setAttribute('stroke', HEADING_ARROW_COLOR);
   shaft.setAttribute('stroke-width', '3');
   shaft.setAttribute('stroke-linecap', 'round');
   g.appendChild(shaft);
 
   const tip = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   tip.setAttribute('d', `M ${center.x - 6},${shaftTipY + 10} L ${center.x},${shaftTipY} L ${center.x + 6},${shaftTipY + 10} Z`);
-  tip.setAttribute('fill', '#e2574c');
+  tip.setAttribute('fill', HEADING_ARROW_COLOR);
   g.appendChild(tip);
 
   return g;
