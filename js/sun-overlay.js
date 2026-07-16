@@ -32,6 +32,7 @@ function createSunPathOverlay() {
       this.svg = null;
       this.position = null; // { lat, lng }
       this.month = null; // { name, points, sunrise, sunset, dayLengthMs, color }, set via setMonth()
+      this.heading = null; // degrees, 0=north/clockwise, set via setHeading()
     }
 
     onAdd() {
@@ -82,9 +83,15 @@ function createSunPathOverlay() {
       this.render();
     }
 
+    setHeading(headingDeg) {
+      this.heading = headingDeg;
+      this.render();
+    }
+
     clear() {
       this.position = null;
       this.month = null;
+      this.heading = null;
       if (this.div) this.div.style.display = 'none';
     }
 
@@ -136,6 +143,10 @@ function createSunPathOverlay() {
 
         this.svg.appendChild(buildSunMarker(offsetPoints[0], this.month.sunrise, true, this.month.timeZone));
         this.svg.appendChild(buildSunMarker(offsetPoints[offsetPoints.length - 1], this.month.sunset, false, this.month.timeZone));
+      }
+
+      if (this.heading !== null) {
+        this.svg.appendChild(buildHeadingArrow(center, this.heading));
       }
     }
   }
@@ -215,6 +226,54 @@ function buildCompassLabels(center) {
     text.textContent = label;
     g.appendChild(text);
   });
+  return g;
+}
+
+// Length of the arrow's pointing shaft, in px from the center -- kept
+// shorter than labelRadius (SUN_OVERLAY_RADIUS + 38) so the arrowhead
+// never overlaps the N/Ø/S/V ring.
+const HEADING_ARROW_LENGTH = SUN_OVERLAY_RADIUS - 15;
+
+// Draws a compass-needle-style pointer from the overlay's center,
+// rotated to headingDeg (0=north=top, clockwise -- the same azimuth
+// convention buildCompassLabels and the sun-path arc already use).
+// Rotating the whole group with a single SVG rotate() around `center`
+// keeps the shaft/tip/tail geometry simple (always drawn pointing
+// straight up, i.e. toward north) while still ending up pointing the
+// right way -- SVG's rotate() is clockwise for positive angles, which
+// already matches this app's azimuth direction, so no sign flip needed.
+function buildHeadingArrow(center, headingDeg) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('transform', `rotate(${headingDeg}, ${center.x}, ${center.y})`);
+
+  // Short grey tail pointing opposite the heading, so the needle reads
+  // as "pivoting around the center" rather than "starting from nothing."
+  const tail = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  tail.setAttribute('x1', String(center.x));
+  tail.setAttribute('y1', String(center.y));
+  tail.setAttribute('x2', String(center.x));
+  tail.setAttribute('y2', String(center.y + 20));
+  tail.setAttribute('stroke', '#999');
+  tail.setAttribute('stroke-width', '3');
+  tail.setAttribute('stroke-linecap', 'round');
+  g.appendChild(tail);
+
+  const shaftTipY = center.y - HEADING_ARROW_LENGTH;
+  const shaft = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  shaft.setAttribute('x1', String(center.x));
+  shaft.setAttribute('y1', String(center.y));
+  shaft.setAttribute('x2', String(center.x));
+  shaft.setAttribute('y2', String(shaftTipY));
+  shaft.setAttribute('stroke', '#e2574c');
+  shaft.setAttribute('stroke-width', '3');
+  shaft.setAttribute('stroke-linecap', 'round');
+  g.appendChild(shaft);
+
+  const tip = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  tip.setAttribute('d', `M ${center.x - 6},${shaftTipY + 10} L ${center.x},${shaftTipY} L ${center.x + 6},${shaftTipY + 10} Z`);
+  tip.setAttribute('fill', '#e2574c');
+  g.appendChild(tip);
+
   return g;
 }
 
