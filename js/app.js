@@ -26,9 +26,24 @@ function initMap() {
   });
 
   setupLocationControls();
+  centerOnUserLocation();
 
   sunOverlay = createSunPathOverlay();
   sunOverlay.setMap(map);
+}
+
+// Just recenters the view on load -- does not drop a pin, so the
+// month picker/sun overview only appear once the user deliberately
+// picks a point (click or the "min posisjon" button).
+function centerOnUserLocation() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      map.setZoom(16);
+    },
+    () => {} // denied/unavailable -- keep the Oslo default
+  );
 }
 
 function setPosition(lat, lng) {
