@@ -33,6 +33,12 @@ function createSunPathOverlay() {
       this.position = null; // { lat, lng }
       this.month = null; // { name, points, sunrise, sunset, dayLengthMs, color }, set via setMonth()
       this.heading = null; // degrees, 0=north/clockwise, set via setHeading()
+      // Always the same value regardless of position/month -- computed once
+      // here so setHeading() can rotate the needle in place without paying
+      // for a full render() on every single DeviceOrientationEvent (which
+      // fires at ~60Hz while the compass is active).
+      this.center = { x: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN, y: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN };
+      this.headingArrowGroup = null; // the <g> built by render(), rotated directly by setHeading()'s fast path
     }
 
     onAdd() {
@@ -85,13 +91,24 @@ function createSunPathOverlay() {
 
     setHeading(headingDeg) {
       this.heading = headingDeg;
-      this.render();
+      if (this.headingArrowGroup) {
+        // Fast path: DeviceOrientationEvent fires continuously while the
+        // compass is active, so this just rewrites one transform attribute
+        // instead of tearing down and rebuilding the whole overlay (labels,
+        // wedge, glow layers, sun markers) on every single event.
+        this.headingArrowGroup.setAttribute('transform', `rotate(${headingDeg}, ${this.center.x}, ${this.center.y})`);
+      } else {
+        // No needle exists yet (compass just turned on) -- one full render()
+        // creates it, after which every subsequent call takes the fast path.
+        this.render();
+      }
     }
 
     clear() {
       this.position = null;
       this.month = null;
       this.heading = null;
+      this.headingArrowGroup = null;
       if (this.div) this.div.style.display = 'none';
     }
 
@@ -99,7 +116,7 @@ function createSunPathOverlay() {
       if (!this.svg || !this.position) return;
       while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);
 
-      const center = { x: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN, y: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN };
+      const center = this.center;
       this.svg.appendChild(buildCompassLabels(center));
 
       if (this.month && this.month.points.length > 1) {
@@ -146,7 +163,10 @@ function createSunPathOverlay() {
       }
 
       if (this.heading !== null) {
-        this.svg.appendChild(buildHeadingArrow(center, this.heading));
+        this.headingArrowGroup = buildHeadingArrow(center, this.heading);
+        this.svg.appendChild(this.headingArrowGroup);
+      } else {
+        this.headingArrowGroup = null;
       }
     }
   }
