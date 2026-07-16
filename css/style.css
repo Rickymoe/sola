@@ -64,12 +64,6 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   height: 22px;
 }
 
-.timezone-label {
-  font-size: 11px;
-  color: #777;
-  margin-bottom: 8px;
-}
-
 .month-buttons {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
