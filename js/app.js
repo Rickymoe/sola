@@ -4,6 +4,8 @@ let currentPosition = null; // { lat, lng }
 let sunOverlay;
 let months = null; // array of 12 { name, points, sunrise, sunset, dayLengthMs, color }
 let selectedMonthIndex = new Date().getMonth();
+let compassActive = false;
+let stopCompassHeading = null;
 
 const DEFAULT_CENTER = { lat: 59.9139, lng: 10.7522 }; // Oslo
 
@@ -67,6 +69,7 @@ function setPosition(lat, lng) {
   renderMonthButtons();
   if (sunOverlay) sunOverlay.setMonth(months[selectedMonthIndex]);
   updateClearButtonVisibility();
+  updateCompassButtonVisibility();
   playSunriseAnimation();
 }
 
@@ -149,11 +152,23 @@ function clearPosition() {
     cancelAnimationFrame(sunriseAnimFrame);
     sunriseAnimFrame = null;
   }
+  if (stopCompassHeading) {
+    stopCompassHeading();
+    stopCompassHeading = null;
+  }
+  compassActive = false;
   updateClearButtonVisibility();
+  updateCompassButtonVisibility();
 }
 
 function updateClearButtonVisibility() {
   document.getElementById('clear-position-btn').classList.toggle('hidden', !currentPosition);
+}
+
+// Hidden once compass tracking is already on (no point re-prompting for
+// permission), and whenever there's no pinned point to show a needle at.
+function updateCompassButtonVisibility() {
+  document.getElementById('compass-btn').classList.toggle('hidden', !currentPosition || compassActive);
 }
 
 function renderMonthButtons() {
@@ -182,6 +197,7 @@ function selectMonth(i) {
 function setupLocationControls() {
   const geolocateBtn = document.getElementById('geolocate-btn');
   const clearBtn = document.getElementById('clear-position-btn');
+  const compassBtn = document.getElementById('compass-btn');
 
   geolocateBtn.addEventListener('click', () => {
     if (!navigator.geolocation) {
@@ -201,6 +217,18 @@ function setupLocationControls() {
 
   clearBtn.addEventListener('click', () => {
     clearPosition();
+  });
+
+  compassBtn.addEventListener('click', () => {
+    startCompassHeading((heading) => {
+      if (sunOverlay) sunOverlay.setHeading(heading);
+    }).then((stopFn) => {
+      compassActive = true;
+      stopCompassHeading = stopFn;
+      updateCompassButtonVisibility();
+    }).catch(() => {
+      alert('Fikk ikke tilgang til retningssensoren.');
+    });
   });
 }
 
