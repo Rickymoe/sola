@@ -9,6 +9,19 @@ let stopCompassHeading = null;
 
 const DEFAULT_CENTER = { lat: 59.9139, lng: 10.7522 }; // Oslo
 
+// Called by Google Maps if the API key is rejected (billing, referrer, etc.).
+// Surfaces the exact cause so the user can screenshot it instead of seeing
+// only the generic "noe gikk galt" message with no hint about what's wrong.
+function gm_authFailure() {
+  var el = document.getElementById('map');
+  if (el) {
+    el.innerHTML = '<div style="background:#fff;padding:20px;margin:20px;border-radius:8px;font-family:sans-serif;text-align:center;color:#d93025;font-size:14px">' +
+      '<strong>Google Maps API-nøkkel avvist</strong><br>' +
+      '<span style="color:#5f6368">Sjekk Google Cloud Console → Credentials:<br>' +
+      'HTTP-referrer, API-restriksjoner, og at Maps JavaScript API er aktivert.</span></div>';
+  }
+}
+
 function initMap() {
   map = new google.maps.Map(document.getElementById('map'), {
     center: DEFAULT_CENTER,
@@ -20,7 +33,6 @@ function initMap() {
     fullscreenControl: false,
     rotateControl: false,
     disableDefaultUI: false,
-    mapId: 'DEMO_MAP_ID',
   });
 
   map.addListener('click', (e) => {
@@ -52,14 +64,19 @@ function setPosition(lat, lng) {
   currentPosition = { lat, lng };
 
   if (marker) {
-    marker.map = null;
+    marker.setMap(null);
   }
-  const dot = document.createElement('div');
-  dot.style.cssText = 'width:16px;height:16px;border-radius:50%;background:#4285f4;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)';
-  marker = new google.maps.marker.AdvancedMarkerElement({
+  marker = new google.maps.Marker({
     position: { lat, lng },
     map,
-    content: dot,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 8,
+      fillColor: '#4285f4',
+      fillOpacity: 1,
+      strokeColor: '#fff',
+      strokeWeight: 2,
+    },
   });
 
   map.panTo({ lat, lng });
@@ -140,7 +157,7 @@ function playSunriseAnimation() {
 
 function clearPosition() {
   if (marker) {
-    marker.map = null;
+    marker.setMap(null);
     marker = null;
   }
   currentPosition = null;
