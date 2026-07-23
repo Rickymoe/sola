@@ -12,8 +12,19 @@ const DEFAULT_CENTER = { lat: 59.9139, lng: 10.7522 }; // Oslo
 // Compass heading only makes sense on a device with an actual magnetometer —
 // desktop browsers may or may not expose DeviceOrientationEvent but the
 // sensor data is absent or nonsense, so hide the button there.
-const SUPPORTS_COMPASS = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) &&
-  typeof DeviceOrientationEvent !== 'undefined';
+// Wrapped in a function (lazy check) rather than a top-level constant so
+// that even in weird browser setups where navigator isn't available yet
+// (unlikely, but defensive), it won't prevent the rest of app.js from
+// parsing — a parse failure here would mean initMap is never defined and
+// the entire map silently fails.
+function supportsCompass() {
+  try {
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) &&
+      typeof DeviceOrientationEvent !== 'undefined';
+  } catch (_) {
+    return false;
+  }
+}
 
 // Called by Google Maps if the API key is rejected (billing, referrer, etc.).
 // Surfaces the exact cause so the user can screenshot it instead of seeing
@@ -191,7 +202,9 @@ function updateClearButtonVisibility() {
 // Hidden once compass tracking is already on (no point re-prompting for
 // permission), and whenever there's no pinned point to show a needle at.
 function updateCompassButtonVisibility() {
-  document.getElementById('compass-btn').classList.toggle('hidden', !SUPPORTS_COMPASS || !currentPosition || compassActive);
+  const btn = document.getElementById('compass-btn');
+  if (!btn) return;
+  btn.classList.toggle('hidden', !supportsCompass() || !currentPosition || compassActive);
 }
 
 function renderMonthButtons() {
