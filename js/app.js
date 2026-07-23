@@ -9,6 +9,12 @@ let stopCompassHeading = null;
 
 const DEFAULT_CENTER = { lat: 59.9139, lng: 10.7522 }; // Oslo
 
+// Compass heading only makes sense on a device with an actual magnetometer —
+// desktop browsers may or may not expose DeviceOrientationEvent but the
+// sensor data is absent or nonsense, so hide the button there.
+const SUPPORTS_COMPASS = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) &&
+  typeof DeviceOrientationEvent !== 'undefined';
+
 // Called by Google Maps if the API key is rejected (billing, referrer, etc.).
 // Surfaces the exact cause so the user can screenshot it instead of seeing
 // only the generic "noe gikk galt" message with no hint about what's wrong.
@@ -185,7 +191,7 @@ function updateClearButtonVisibility() {
 // Hidden once compass tracking is already on (no point re-prompting for
 // permission), and whenever there's no pinned point to show a needle at.
 function updateCompassButtonVisibility() {
-  document.getElementById('compass-btn').classList.toggle('hidden', !currentPosition || compassActive);
+  document.getElementById('compass-btn').classList.toggle('hidden', !SUPPORTS_COMPASS || !currentPosition || compassActive);
 }
 
 function renderMonthButtons() {
