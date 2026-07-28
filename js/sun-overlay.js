@@ -172,6 +172,11 @@ function createSunPathOverlay() {
         dot.setAttribute('cy', String(nowPoint.y + SUN_OVERLAY_MARGIN));
         dot.setAttribute('r', '5');
         dot.setAttribute('fill', this.month.color);
+        // A white stroke stops the dot from disappearing into the arc's own
+        // same-colored glow layers underneath it (confirmed near-invisible
+        // without this: same rgb() fill sitting on the same-hue wedge/glow).
+        dot.setAttribute('stroke', '#fff');
+        dot.setAttribute('stroke-width', '2');
         dot.setAttribute('class', 'sun-now-dot');
         this.svg.appendChild(dot);
       }
