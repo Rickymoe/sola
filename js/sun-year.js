@@ -21,6 +21,23 @@ function sunPolarToXY(azimuthDeg, altitudeDeg) {
   };
 }
 
+// Solar position "right now" mapped into the overlay's own polar
+// coordinate space (same convention as sunPolarToXY: origin at the
+// overlay's center, not yet offset by SUN_OVERLAY_MARGIN -- the caller in
+// js/sun-overlay.js applies that same offset it already applies to every
+// other point). Returns null whenever there's nothing to draw: `month`
+// isn't the one representing today (see isToday in getMonthlyOverview
+// above), no position is pinned yet, or the sun is currently below the
+// horizon (night). Takes `now` as a parameter (defaulting to the real
+// clock) purely so it can be tested with a fixed instant instead of
+// depending on wall-clock time.
+function computeNowPoint(month, position, now = new Date()) {
+  if (!month || !month.isToday || !position) return null;
+  const { azimuthDeg, altitudeDeg } = getSunPosition(now, position.lat, position.lng);
+  if (altitudeDeg < 0) return null;
+  return sunPolarToXY(azimuthDeg, altitudeDeg);
+}
+
 // Finds the Date where altitude crosses 0° between two consecutive
 // samples, by linear interpolation. Used for both sunrise (altitude going
 // negative -> positive) and sunset (positive -> negative).
@@ -59,6 +76,22 @@ function zonedMidnightUtcMs(year, month, day, timeZone) {
   const guessMs = Date.UTC(year, month, day, 0, 0, 0);
   const offsetMin = getUtcOffsetMinutes(new Date(guessMs), timeZone);
   return guessMs - offsetMin * 60000;
+}
+
+// Calendar date (year/month-index/day) for `now` as seen in the given IANA
+// time zone -- reused so "is this month today?" and "which day of the
+// month is today?" both mean the pinned LOCATION's calendar day, not the
+// browser's, matching every other zoned-day computation in this file (see
+// zonedMidnightUtcMs above).
+function todayInTimeZone(now, timeZone) {
+  const parts = {};
+  for (const { type, value } of new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now)) {
+    parts[type] = value;
+  }
+  return { year: Number(parts.year), month: Number(parts.month) - 1, day: Number(parts.day) };
 }
 
 // Samples one full local day (midnight to midnight, in the given IANA time
@@ -105,16 +138,22 @@ function monthColor(fraction) {
 
 // Computes all 12 months' day-arcs + sunrise/sunset for a given location
 // (15th of each month, in the LOCATION's own time zone -- not the
-// browser's), colored along a gradient from indigo (shortest day of the
-// 12) to deep orange (longest day of the 12) based on each month's own day
-// length relative to the other 11 at this specific latitude. Returns an
-// array of 12 objects in January-to-December order.
-function getMonthlyOverview(lat, lng, year, timeZone) {
+// browser's -- EXCEPT for whichever month is today's real calendar month,
+// which uses today's actual day-of-month instead and is marked
+// isToday: true, so a "sun's position right now" marker can be placed
+// exactly on that one arc), colored along a gradient from indigo (shortest
+// day of the 12) to deep orange (longest day of the 12) based on each
+// month's own day length relative to the other 11 at this specific
+// latitude. Returns an array of 12 objects in January-to-December order.
+function getMonthlyOverview(lat, lng, year, timeZone, now = new Date()) {
+  const today = todayInTimeZone(now, timeZone);
   const months = [];
   for (let m = 0; m < 12; m++) {
-    const { points, sunrise, sunset } = sampleDayArc(year, m, MONTH_REPRESENTATIVE_DAY, lat, lng, timeZone);
+    const isToday = year === today.year && m === today.month;
+    const day = isToday ? today.day : MONTH_REPRESENTATIVE_DAY;
+    const { points, sunrise, sunset } = sampleDayArc(year, m, day, lat, lng, timeZone);
     const dayLengthMs = sunrise && sunset ? sunset.getTime() - sunrise.getTime() : null;
-    months.push({ name: MONTH_NAMES[m], points, sunrise, sunset, dayLengthMs, color: null, timeZone });
+    months.push({ name: MONTH_NAMES[m], points, sunrise, sunset, dayLengthMs, color: null, timeZone, isToday });
   }
 
   const lengths = months.map((mo) => mo.dayLengthMs).filter((v) => v !== null);
