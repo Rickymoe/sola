@@ -91,3 +91,15 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   opacity: 1;
   border-color: #333;
 }
+
+/* "Nå"-punkt på solbuen (js/sun-overlay.js) -- pulserer for å signalisere
+   at det er et live øyeblikksbilde, selv om posisjonen selv er statisk
+   (regnes kun ut når render() kjører, ikke på en timer). */
+.sun-now-dot {
+  animation: sun-now-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sun-now-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}

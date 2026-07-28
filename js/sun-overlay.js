@@ -162,6 +162,20 @@ function createSunPathOverlay() {
         this.svg.appendChild(buildSunMarker(offsetPoints[offsetPoints.length - 1], this.month.sunset, false, this.month.timeZone));
       }
 
+      // computeNowPoint() (js/sun-year.js) already returns null for every
+      // case where nothing should be drawn (not today's month, no
+      // position, or night), so no extra guard is needed here.
+      const nowPoint = computeNowPoint(this.month, this.position);
+      if (nowPoint) {
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', String(nowPoint.x + SUN_OVERLAY_MARGIN));
+        dot.setAttribute('cy', String(nowPoint.y + SUN_OVERLAY_MARGIN));
+        dot.setAttribute('r', '5');
+        dot.setAttribute('fill', this.month.color);
+        dot.setAttribute('class', 'sun-now-dot');
+        this.svg.appendChild(dot);
+      }
+
       if (this.heading !== null) {
         this.headingArrowGroup = buildHeadingArrow(center, this.heading);
         this.svg.appendChild(this.headingArrowGroup);
