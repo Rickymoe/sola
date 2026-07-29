@@ -164,12 +164,18 @@ function createSunPathOverlay() {
 
       // computeNowPoint() (js/sun-year.js) already returns null for every
       // case where nothing should be drawn (not today's month, no
-      // position, or night), so no extra guard is needed here.
-      const nowPoint = computeNowPoint(this.month, this.position);
+      // position, or night), so no extra guard is needed here. `now` is
+      // captured once here and reused for the time label below so the dot's
+      // position and its label can never disagree by straddling a minute
+      // boundary across two separate `new Date()` calls.
+      const now = new Date();
+      const nowPoint = computeNowPoint(this.month, this.position, now);
       if (nowPoint) {
+        const dotX = nowPoint.x + SUN_OVERLAY_MARGIN;
+        const dotY = nowPoint.y + SUN_OVERLAY_MARGIN;
         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        dot.setAttribute('cx', String(nowPoint.x + SUN_OVERLAY_MARGIN));
-        dot.setAttribute('cy', String(nowPoint.y + SUN_OVERLAY_MARGIN));
+        dot.setAttribute('cx', String(dotX));
+        dot.setAttribute('cy', String(dotY));
         dot.setAttribute('r', '5');
         dot.setAttribute('fill', this.month.color);
         // A white stroke stops the dot from disappearing into the arc's own
@@ -179,6 +185,7 @@ function createSunPathOverlay() {
         dot.setAttribute('stroke-width', '2');
         dot.setAttribute('class', 'sun-now-dot');
         this.svg.appendChild(dot);
+        this.svg.appendChild(buildNowLabel({ x: dotX, y: dotY }, formatTime(now, this.month.timeZone)));
       }
 
       if (this.heading !== null) {
@@ -379,6 +386,44 @@ function buildSunMarker(point, time, isSunrise, timeZone) {
   text.setAttribute('stroke-width', '3');
   text.setAttribute('paint-order', 'stroke');
   text.textContent = formatTime(time, timeZone);
+  g.appendChild(text);
+
+  return g;
+}
+
+// Builds the small "HH:MM" pill shown next to the pulsing now-dot (see the
+// `sun-now-dot` circle in render()). Unlike buildSunMarker()'s badges --
+// which sit at the arc's two fixed endpoints and can lay out their icon +
+// text around a local origin -- this dot can land anywhere along the arc
+// depending on the time of day, so the label uses a plain fixed pixel
+// offset from the dot instead. `point` must already be offset by
+// SUN_OVERLAY_MARGIN, same convention as the dot's own cx/cy.
+function buildNowLabel(point, timeText) {
+  const NOW_LABEL_OFFSET_X = 14;
+  const NOW_LABEL_OFFSET_Y = 14;
+  const PILL_WIDTH = 34;
+  const PILL_HEIGHT = 16;
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('transform', `translate(${point.x + NOW_LABEL_OFFSET_X}, ${point.y + NOW_LABEL_OFFSET_Y})`);
+
+  const pill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  pill.setAttribute('x', String(-PILL_WIDTH / 2));
+  pill.setAttribute('y', String(-PILL_HEIGHT / 2));
+  pill.setAttribute('width', String(PILL_WIDTH));
+  pill.setAttribute('height', String(PILL_HEIGHT));
+  pill.setAttribute('rx', String(PILL_HEIGHT / 2));
+  pill.setAttribute('fill', '#fff');
+  g.appendChild(pill);
+
+  const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  text.setAttribute('x', '0');
+  text.setAttribute('y', '4');
+  text.setAttribute('text-anchor', 'middle');
+  text.setAttribute('font-size', '11');
+  text.setAttribute('font-weight', '600');
+  text.setAttribute('fill', '#333');
+  text.textContent = timeText;
   g.appendChild(text);
 
   return g;
