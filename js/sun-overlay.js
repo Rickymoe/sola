@@ -137,6 +137,78 @@ function createSunPathOverlay() {
       this.render();
     }
 
+    // Converts a pointer position (in page/client coordinates) into an
+    // azimuth relative to this overlay's own center, updates the dragged
+    // edge (clamped), and re-renders -- attached to window (not just the
+    // handle) for the duration of the drag so fast pointer movement past
+    // the thin handle itself doesn't drop the drag.
+    startFacadeDrag(edge, pointerEvent, hitLine) {
+      if (!this.facadeRange) return;
+      hitLine.style.cursor = 'grabbing';
+
+      const onMove = (moveEvent) => {
+        const rect = this.svg.getBoundingClientRect();
+        const localX = moveEvent.clientX - rect.left;
+        const localY = moveEvent.clientY - rect.top;
+        const dx = localX - this.center.x;
+        const dy = localY - this.center.y;
+        const candidateAzimuthDeg = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+
+        const clamped = this.clampFacadeAzimuth(edge, candidateAzimuthDeg);
+        if (edge === 'start') {
+          this.facadeRange.startAzimuthDeg = clamped;
+        } else {
+          this.facadeRange.endAzimuthDeg = clamped;
+        }
+        this.scheduleFacadeRender();
+      };
+
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+      };
+
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    }
+
+    // Clamps a candidate azimuth for the given edge so it can only move
+    // INWARD: never past its own original bound (activateFacadeRange()'s
+    // starting position), never past the other edge's current position.
+    // Works in "position along the original clockwise span" terms (0 at
+    // the original start, totalSpan at the original end) so the wraparound
+    // (e.g. a facade spanning through 350deg -> 40deg) is handled the same
+    // way isAzimuthInRange() handles it, without a separate code path.
+    clampFacadeAzimuth(edge, candidateAzimuthDeg) {
+      const { originalStartAzimuthDeg, originalEndAzimuthDeg, startAzimuthDeg, endAzimuthDeg } = this.facadeRange;
+      const totalSpan = ((originalEndAzimuthDeg - originalStartAzimuthDeg) % 360 + 360) % 360;
+      const pos = (az) => ((az - originalStartAzimuthDeg) % 360 + 360) % 360;
+      const candidatePos = pos(candidateAzimuthDeg);
+
+      let clampedPos;
+      if (edge === 'start') {
+        clampedPos = Math.min(Math.max(candidatePos, 0), pos(endAzimuthDeg));
+      } else {
+        clampedPos = Math.min(Math.max(candidatePos, pos(startAzimuthDeg)), totalSpan);
+      }
+      return (originalStartAzimuthDeg + clampedPos + 360) % 360;
+    }
+
+    // Pointer moves fire far more often than a render() needs to happen --
+    // batches to at most one render per animation frame instead of one per
+    // event (same reasoning as js/app.js's playSunriseAnimation using rAF
+    // rather than firing on every event source directly).
+    scheduleFacadeRender() {
+      if (this._facadeRenderPending) return;
+      this._facadeRenderPending = true;
+      requestAnimationFrame(() => {
+        this._facadeRenderPending = false;
+        this.render();
+      });
+    }
+
     render() {
       if (!this.svg || !this.position) return;
       while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);
@@ -234,8 +306,8 @@ function createSunPathOverlay() {
         this.svg.appendChild(buildSunMarker(offsetPoints[offsetPoints.length - 1], this.month.sunset, false, this.month.timeZone));
 
         if (this.facadeRange) {
-          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.startAzimuthDeg, this.month.points, this.month.timeZone, () => {}));
-          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.endAzimuthDeg, this.month.points, this.month.timeZone, () => {}));
+          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.startAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('start', e, hitLine)));
+          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.endAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('end', e, hitLine)));
         }
       }
 
