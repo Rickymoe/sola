@@ -185,7 +185,8 @@ function createSunPathOverlay() {
         dot.setAttribute('stroke-width', '2');
         dot.setAttribute('class', 'sun-now-dot');
         this.svg.appendChild(dot);
-        this.svg.appendChild(buildNowLabel({ x: dotX, y: dotY }, this.center, formatTime(now, this.month.timeZone)));
+        const tangent = { x: nowPoint.tangentX, y: nowPoint.tangentY };
+        this.svg.appendChild(buildNowLabel({ x: dotX, y: dotY }, this.center, tangent, formatTime(now, this.month.timeZone)));
       }
 
       if (this.heading !== null) {
@@ -392,31 +393,39 @@ function buildSunMarker(point, time, isSunrise, timeZone) {
 }
 
 // Builds the small "HH:MM" pill shown next to the pulsing now-dot (see the
-// `sun-now-dot` circle in render()). The wedge fill (render()) covers every
-// radius from `center` out to the rim across the whole sunrise-to-sunset
-// angular span, so the dot itself can sit anywhere from near-center (solar
-// noon) to right at the rim (near sunrise/sunset) depending on the time of
-// day. A first attempt pushed the pill a fixed distance out FROM THE DOT,
-// which only clears the wedge once the dot is already close to the rim --
-// confirmed live: it still sat inside the wedge in the middle of the
-// afternoon, well before sunset, since dot-radius + 19px was still well
-// under the rim. Instead, keep the dot's angle (its direction from center)
-// but place the pill at a FIXED radius just past the rim -- same treatment
-// as buildCompassLabels()'s N/Ø/S/V ring, so it always clears the wedge and
-// the arc regardless of what time of day the dot itself sits at. `point`
-// must already be offset by SUN_OVERLAY_MARGIN, same convention as the
-// dot's own cx/cy; `center` is the overlay's center in that same
-// coordinate space (this.center).
-function buildNowLabel(point, center, timeText) {
-  const LABEL_RADIUS = SUN_OVERLAY_RADIUS + 22; // just past the rim (wedge/arc max out at SUN_OVERLAY_RADIUS), short of the compass ring at +38
+// `sun-now-dot` circle in render()). Two earlier approaches both missed:
+// pushing the pill a fixed distance out FROM THE DOT along the center->dot
+// direction only clears the wedge once the dot is already near the rim
+// (confirmed live: still inside the wedge mid-afternoon, well before
+// sunset). Pinning it to a fixed radius past the rim instead (matching
+// buildCompassLabels()'s ring) cleared the wedge at every time of day, but
+// left the pill looking disconnected from the dot when the dot itself
+// sits far from the rim. Instead, offset perpendicular to the arc's own
+// local direction of travel (`tangent`, from computeNowPoint() in
+// js/sun-year.js) -- this only needs to clear the stroke's own width, not
+// the whole wedge, so the pill can stay close to the dot at any time of
+// day. `point` must already be offset by SUN_OVERLAY_MARGIN, same
+// convention as the dot's own cx/cy; `center` disambiguates which of the
+// two perpendicular directions points away from the wedge (outward).
+function buildNowLabel(point, center, tangent, timeText) {
+  const LABEL_GAP = 20; // px perpendicular to the arc -- clears the widest glow layer (16px stroke, 8px half-width) plus room for the pill itself
   const PILL_WIDTH = 34;
   const PILL_HEIGHT = 16;
 
-  const dx = point.x - center.x;
-  const dy = point.y - center.y;
-  const dist = Math.hypot(dx, dy) || 1;
-  const labelX = center.x + (dx / dist) * LABEL_RADIUS;
-  const labelY = center.y + (dy / dist) * LABEL_RADIUS;
+  // Perpendicular to the direction of travel -- two candidates, rotated
+  // +90 deg and -90 deg from the tangent. Pick whichever one points away
+  // from center (same side as the dot already is), so the pill always
+  // lands on the outward side of the curve, not back toward the wedge.
+  let px = -tangent.y;
+  let py = tangent.x;
+  const outwardDot = (point.x - center.x) * px + (point.y - center.y) * py;
+  if (outwardDot < 0) {
+    px = -px;
+    py = -py;
+  }
+
+  const labelX = point.x + px * LABEL_GAP;
+  const labelY = point.y + py * LABEL_GAP;
 
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('transform', `translate(${labelX}, ${labelY})`);

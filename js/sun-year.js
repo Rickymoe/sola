@@ -35,7 +35,32 @@ function computeNowPoint(month, position, now = new Date()) {
   if (!month || !month.isToday || !position) return null;
   const { azimuthDeg, altitudeDeg } = getSunPosition(now, position.lat, position.lng);
   if (altitudeDeg < 0) return null;
-  return sunPolarToXY(azimuthDeg, altitudeDeg);
+  const point = sunPolarToXY(azimuthDeg, altitudeDeg);
+
+  // Direction of travel along the arc at `now`, used by buildNowLabel()
+  // (js/sun-overlay.js) to offset the time label perpendicular to the
+  // curve itself rather than radially from the overlay's center. A radial
+  // offset only clears the wedge once the sun is already low: mid-
+  // afternoon, with the sun still high (small radius from center), a small
+  // radial push left the label deep inside the wedge, and pinning it to a
+  // fixed radius past the rim instead left it looking disconnected from
+  // the dot. Sampling a few minutes ahead and taking the direction to that
+  // point gives the curve's actual local direction, so a small
+  // perpendicular push reliably clears just the stroke, at any time of day.
+  const TANGENT_STEP_MINUTES = 5;
+  const later = new Date(now.getTime() + TANGENT_STEP_MINUTES * 60000);
+  const laterSun = getSunPosition(later, position.lat, position.lng);
+  const laterPoint = sunPolarToXY(laterSun.azimuthDeg, laterSun.altitudeDeg);
+  const tangentDx = laterPoint.x - point.x;
+  const tangentDy = laterPoint.y - point.y;
+  const tangentLen = Math.hypot(tangentDx, tangentDy) || 1;
+
+  return {
+    x: point.x,
+    y: point.y,
+    tangentX: tangentDx / tangentLen,
+    tangentY: tangentDy / tangentLen,
+  };
 }
 
 // Finds the Date where altitude crosses 0° between two consecutive
