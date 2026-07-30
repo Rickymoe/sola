@@ -73,6 +73,62 @@ function interpolateCrossing(prev, cur) {
   return new Date(ms);
 }
 
+// True if azimuthDeg falls within the clockwise arc from startAzimuthDeg to
+// endAzimuthDeg (wrapping past 360° if endAzimuthDeg < startAzimuthDeg) --
+// used by the facade field-of-view feature (js/sun-overlay.js) to decide
+// whether a given point on the day's arc faces the user-defined facade.
+function isAzimuthInRange(azimuthDeg, startAzimuthDeg, endAzimuthDeg) {
+  const span = ((endAzimuthDeg - startAzimuthDeg) % 360 + 360) % 360;
+  const offset = ((azimuthDeg - startAzimuthDeg) % 360 + 360) % 360;
+  return offset <= span;
+}
+
+// Finds the Date the sun crosses a given azimuth along one day's arc, by
+// linearly interpolating between the two chronologically-adjacent points
+// (in `points`, as returned by sampleDayArc -- already time-ordered) whose
+// azimuths bracket it. Returns null if azimuthDeg never occurs that day
+// (outside the arc's own sunrise-to-sunset azimuth sweep). Assumes azimuth
+// moves in one consistent direction through the day, true at all but
+// extreme high-latitude edge cases -- same accepted-edge-case standard as
+// zonedMidnightUtcMs's DST handling above.
+function findTimeForAzimuth(points, azimuthDeg) {
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const cur = points[i];
+    const span = cur.azimuthDeg - prev.azimuthDeg;
+    if (span === 0) continue;
+    const frac = (azimuthDeg - prev.azimuthDeg) / span;
+    if (frac >= 0 && frac <= 1) {
+      const ms = prev.t.getTime() + frac * (cur.t.getTime() - prev.t.getTime());
+      return new Date(ms);
+    }
+  }
+  return null;
+}
+
+// Splits `points` (with azimuthDeg per point, as returned by
+// sampleDayArc()) into contiguous runs of facing/non-facing relative to
+// facadeRange ({ startAzimuthDeg, endAzimuthDeg }), for rendering each run
+// with different emphasis (js/sun-overlay.js). Runs are index ranges
+// [start, end] (both inclusive) into the same points array; adjacent runs
+// share their boundary index on purpose, so polylines built from
+// consecutive runs connect with no visual gap at the transition.
+function splitByFacing(points, facadeRange) {
+  const runs = [];
+  let runStart = 0;
+  let runFacing = isAzimuthInRange(points[0].azimuthDeg, facadeRange.startAzimuthDeg, facadeRange.endAzimuthDeg);
+  for (let i = 1; i < points.length; i++) {
+    const facing = isAzimuthInRange(points[i].azimuthDeg, facadeRange.startAzimuthDeg, facadeRange.endAzimuthDeg);
+    if (facing !== runFacing) {
+      runs.push({ start: runStart, end: i, facing: runFacing });
+      runStart = i;
+      runFacing = facing;
+    }
+  }
+  runs.push({ start: runStart, end: points.length - 1, facing: runFacing });
+  return runs;
+}
+
 // UTC offset (minutes, local-minus-UTC) for the given instant in the given
 // IANA time zone -- resolves DST correctly since Intl looks up the actual
 // rule in effect at that specific date, not just a fixed offset.
@@ -136,7 +192,7 @@ function sampleDayArc(year, month, day, lat, lng, timeZone) {
 
   const points = samples
     .filter((s) => s.altitudeDeg >= 0)
-    .map((s) => sunPolarToXY(s.azimuthDeg, s.altitudeDeg));
+    .map((s) => ({ ...sunPolarToXY(s.azimuthDeg, s.altitudeDeg), t: s.t, azimuthDeg: s.azimuthDeg }));
 
   let sunrise = null;
   let sunset = null;
