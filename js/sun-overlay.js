@@ -144,9 +144,11 @@ function createSunPathOverlay() {
     // the thin handle itself doesn't drop the drag.
     startFacadeDrag(edge, pointerEvent, hitLine) {
       if (!this.facadeRange) return;
+      const pointerId = pointerEvent.pointerId;
       hitLine.style.cursor = 'grabbing';
 
       const onMove = (moveEvent) => {
+        if (moveEvent.pointerId !== pointerId) return;
         const rect = this.svg.getBoundingClientRect();
         const localX = moveEvent.clientX - rect.left;
         const localY = moveEvent.clientY - rect.top;
@@ -163,7 +165,9 @@ function createSunPathOverlay() {
         this.scheduleFacadeRender();
       };
 
-      const onUp = () => {
+      const onUp = (upEvent) => {
+        if (upEvent.pointerId !== pointerId) return;
+        hitLine.style.cursor = 'grab';
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onUp);

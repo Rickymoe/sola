@@ -94,22 +94,24 @@ function circularDistanceDeg(a, b) {
   return diff > 180 ? 360 - diff : diff;
 }
 
-// Clamps candidateAzimuthDeg onto the clockwise arc from lowerAzimuthDeg to
-// upperAzimuthDeg. If the candidate already falls on that arc, returns it
-// unchanged; otherwise returns whichever boundary is angularly CLOSER (true
-// circular distance, not a linear pos-space comparison) -- this is what
-// clampFacadeAzimuth() (js/sun-overlay.js) needs instead of the buggy
+// Clamps candidateAzimuthDeg onto the clockwise arc from startAzimuthDeg to
+// endAzimuthDeg (naming matches isAzimuthInRange's own -- these are arc
+// endpoints along a clockwise sweep that can wrap past 360deg, not numeric
+// lower/upper bounds). If the candidate already falls on that arc, returns
+// it unchanged; otherwise returns whichever boundary is angularly CLOSER
+// (true circular distance, not a linear pos-space comparison) -- this is
+// what clampFacadeAzimuth() (js/sun-overlay.js) needs instead of the buggy
 // pos-space-only clamp: a candidate that overshoots backward past
-// lowerAzimuthDeg by a small amount must clamp to lowerAzimuthDeg, not jump
-// to upperAzimuthDeg just because a fixed-direction "distance from lower"
+// startAzimuthDeg by a small amount must clamp to startAzimuthDeg, not jump
+// to endAzimuthDeg just because a fixed-direction "distance from start"
 // measurement wraps it to a large value.
-function clampAzimuthToArc(candidateAzimuthDeg, lowerAzimuthDeg, upperAzimuthDeg) {
-  if (isAzimuthInRange(candidateAzimuthDeg, lowerAzimuthDeg, upperAzimuthDeg)) {
+function clampAzimuthToArc(candidateAzimuthDeg, startAzimuthDeg, endAzimuthDeg) {
+  if (isAzimuthInRange(candidateAzimuthDeg, startAzimuthDeg, endAzimuthDeg)) {
     return candidateAzimuthDeg;
   }
-  const distToLower = circularDistanceDeg(candidateAzimuthDeg, lowerAzimuthDeg);
-  const distToUpper = circularDistanceDeg(candidateAzimuthDeg, upperAzimuthDeg);
-  return distToLower <= distToUpper ? lowerAzimuthDeg : upperAzimuthDeg;
+  const distToStart = circularDistanceDeg(candidateAzimuthDeg, startAzimuthDeg);
+  const distToEnd = circularDistanceDeg(candidateAzimuthDeg, endAzimuthDeg);
+  return distToStart <= distToEnd ? startAzimuthDeg : endAzimuthDeg;
 }
 
 // Finds the Date the sun crosses a given azimuth along one day's arc, by
