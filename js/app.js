@@ -6,6 +6,7 @@ let months = null; // array of 12 { name, points, sunrise, sunset, dayLengthMs, 
 let selectedMonthIndex = new Date().getMonth();
 let compassActive = false;
 let stopCompassHeading = null;
+let facadeActive = false; // mirrors whether sunOverlay.facadeRange is set -- tracked as a top-level flag to match the existing compassActive convention
 
 const DEFAULT_CENTER = { lat: 59.9139, lng: 10.7522 }; // Oslo
 
@@ -80,6 +81,9 @@ function centerOnUserLocation() {
 function setPosition(lat, lng) {
   currentPosition = { lat, lng };
 
+  if (sunOverlay) sunOverlay.clearFacadeRange();
+  facadeActive = false;
+
   if (marker) {
     marker.setMap(null);
   }
@@ -104,6 +108,7 @@ function setPosition(lat, lng) {
   if (sunOverlay) sunOverlay.setMonth(months[selectedMonthIndex]);
   updateClearButtonVisibility();
   updateCompassButtonVisibility();
+  updateFacadeButtonVisibility();
   playSunriseAnimation();
 }
 
@@ -180,6 +185,8 @@ function clearPosition() {
   currentPosition = null;
   months = null;
   if (sunOverlay) sunOverlay.clear();
+  if (sunOverlay) sunOverlay.clearFacadeRange();
+  facadeActive = false;
   document.getElementById('month-buttons-container').innerHTML = '';
   document.getElementById('sunrise-anim').classList.add('hidden');
   if (sunriseAnimFrame) {
@@ -193,6 +200,7 @@ function clearPosition() {
   compassActive = false;
   updateClearButtonVisibility();
   updateCompassButtonVisibility();
+  updateFacadeButtonVisibility();
 }
 
 function updateClearButtonVisibility() {
@@ -205,6 +213,12 @@ function updateCompassButtonVisibility() {
   const btn = document.getElementById('compass-btn');
   if (!btn) return;
   btn.classList.toggle('hidden', !supportsCompass() || !currentPosition || compassActive);
+}
+
+function updateFacadeButtonVisibility() {
+  const btn = document.getElementById('facade-btn');
+  if (!btn) return;
+  btn.classList.toggle('hidden', !currentPosition);
 }
 
 function renderMonthButtons() {
@@ -265,6 +279,17 @@ function setupLocationControls() {
     }).catch(() => {
       alert('Fikk ikke tilgang til retningssensoren.');
     });
+  });
+
+  const facadeBtn = document.getElementById('facade-btn');
+  facadeBtn.addEventListener('click', () => {
+    if (facadeActive) {
+      sunOverlay.clearFacadeRange();
+      facadeActive = false;
+    } else {
+      sunOverlay.activateFacadeRange();
+      facadeActive = true;
+    }
   });
 }
 
