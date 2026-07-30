@@ -177,23 +177,22 @@ function createSunPathOverlay() {
     // Clamps a candidate azimuth for the given edge so it can only move
     // INWARD: never past its own original bound (activateFacadeRange()'s
     // starting position), never past the other edge's current position.
-    // Works in "position along the original clockwise span" terms (0 at
-    // the original start, totalSpan at the original end) so the wraparound
-    // (e.g. a facade spanning through 350deg -> 40deg) is handled the same
-    // way isAzimuthInRange() handles it, without a separate code path.
+    // Delegates to clampAzimuthToArc() (js/sun-year.js), which clamps onto
+    // the arc using true circular distance to each boundary -- an earlier
+    // version of this method compared positions in one fixed clockwise
+    // direction only, which wrapped a candidate that overshot backward past
+    // its own bound by a small amount into a huge fixed-direction "distance",
+    // clamping it to the FAR edge instead of holding it at its own bound.
+    // Confirmed live: dragging 'start' backward past originalStartAzimuthDeg
+    // by 40deg (July, 59.91N) used to jump the handle across the whole
+    // circle to endAzimuthDeg; clampAzimuthToArc's true-circular-distance
+    // comparison holds it at originalStartAzimuthDeg instead.
     clampFacadeAzimuth(edge, candidateAzimuthDeg) {
       const { originalStartAzimuthDeg, originalEndAzimuthDeg, startAzimuthDeg, endAzimuthDeg } = this.facadeRange;
-      const totalSpan = ((originalEndAzimuthDeg - originalStartAzimuthDeg) % 360 + 360) % 360;
-      const pos = (az) => ((az - originalStartAzimuthDeg) % 360 + 360) % 360;
-      const candidatePos = pos(candidateAzimuthDeg);
-
-      let clampedPos;
       if (edge === 'start') {
-        clampedPos = Math.min(Math.max(candidatePos, 0), pos(endAzimuthDeg));
-      } else {
-        clampedPos = Math.min(Math.max(candidatePos, pos(startAzimuthDeg)), totalSpan);
+        return clampAzimuthToArc(candidateAzimuthDeg, originalStartAzimuthDeg, endAzimuthDeg);
       }
-      return (originalStartAzimuthDeg + clampedPos + 360) % 360;
+      return clampAzimuthToArc(candidateAzimuthDeg, startAzimuthDeg, originalEndAzimuthDeg);
     }
 
     // Pointer moves fire far more often than a render() needs to happen --

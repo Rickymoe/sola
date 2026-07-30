@@ -83,6 +83,35 @@ function isAzimuthInRange(azimuthDeg, startAzimuthDeg, endAzimuthDeg) {
   return offset <= span;
 }
 
+// Shortest angular distance between two azimuths (0-180 deg), independent of
+// direction -- used by clampAzimuthToArc() to decide which of two boundary
+// azimuths a candidate is actually closer to, rather than assuming one fixed
+// clockwise direction (which is what caused the wraparound bug: a candidate
+// just behind the lower bound looks, in a single fixed direction, like it's
+// most of the way around the OTHER side of the circle).
+function circularDistanceDeg(a, b) {
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
+// Clamps candidateAzimuthDeg onto the clockwise arc from lowerAzimuthDeg to
+// upperAzimuthDeg. If the candidate already falls on that arc, returns it
+// unchanged; otherwise returns whichever boundary is angularly CLOSER (true
+// circular distance, not a linear pos-space comparison) -- this is what
+// clampFacadeAzimuth() (js/sun-overlay.js) needs instead of the buggy
+// pos-space-only clamp: a candidate that overshoots backward past
+// lowerAzimuthDeg by a small amount must clamp to lowerAzimuthDeg, not jump
+// to upperAzimuthDeg just because a fixed-direction "distance from lower"
+// measurement wraps it to a large value.
+function clampAzimuthToArc(candidateAzimuthDeg, lowerAzimuthDeg, upperAzimuthDeg) {
+  if (isAzimuthInRange(candidateAzimuthDeg, lowerAzimuthDeg, upperAzimuthDeg)) {
+    return candidateAzimuthDeg;
+  }
+  const distToLower = circularDistanceDeg(candidateAzimuthDeg, lowerAzimuthDeg);
+  const distToUpper = circularDistanceDeg(candidateAzimuthDeg, upperAzimuthDeg);
+  return distToLower <= distToUpper ? lowerAzimuthDeg : upperAzimuthDeg;
+}
+
 // Finds the Date the sun crosses a given azimuth along one day's arc, by
 // linearly interpolating between the two chronologically-adjacent points
 // (in `points`, as returned by sampleDayArc -- already time-ordered) whose
