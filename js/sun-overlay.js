@@ -39,6 +39,7 @@ function createSunPathOverlay() {
       // fires at ~60Hz while the compass is active).
       this.center = { x: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN, y: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN };
       this.headingArrowGroup = null; // the <g> built by render(), rotated directly by setHeading()'s fast path
+      this.facadeRange = null; // { startAzimuthDeg, endAzimuthDeg, originalStartAzimuthDeg, originalEndAzimuthDeg } or null -- see activateFacadeRange()
     }
 
     onAdd() {
@@ -112,6 +113,30 @@ function createSunPathOverlay() {
       if (this.div) this.div.style.display = 'none';
     }
 
+    // Seeds the facade range from the CURRENT month's own sunrise-to-sunset
+    // azimuth sweep (its first and last arc point) -- the pie slice starts
+    // exactly matching the visible arc's own reach, and the user narrows it
+    // from there by dragging an edge inward. No-op if there's no month/arc
+    // to seed from yet (button is hidden in that state anyway -- see
+    // js/app.js -- but guard here too since this is a public method).
+    activateFacadeRange() {
+      if (!this.month || this.month.points.length < 2) return;
+      const start = this.month.points[0].azimuthDeg;
+      const end = this.month.points[this.month.points.length - 1].azimuthDeg;
+      this.facadeRange = {
+        startAzimuthDeg: start,
+        endAzimuthDeg: end,
+        originalStartAzimuthDeg: start,
+        originalEndAzimuthDeg: end,
+      };
+      this.render();
+    }
+
+    clearFacadeRange() {
+      this.facadeRange = null;
+      this.render();
+    }
+
     render() {
       if (!this.svg || !this.position) return;
       while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);
@@ -139,27 +164,79 @@ function createSunPathOverlay() {
 
         // Layered strokes from wide/faint to thin/opaque fake a soft glow:
         // the color reads strong in the center of the arc and fades toward
-        // its edges, rather than one flat-colored line.
+        // its edges, rather than one flat-colored line. When a facade range
+        // is active, drawn per facing/non-facing run instead of once for
+        // the whole arc, so the non-facing runs can be a fraction of the
+        // opacity -- the whole arc still reads as one continuous glow,
+        // just fainter outside the facade's field of view.
         const GLOW_LAYERS = [
           { width: 16, opacity: 0.12 },
           { width: 10, opacity: 0.25 },
           { width: 5, opacity: 0.55 },
           { width: 2, opacity: 1 },
         ];
-        for (const layer of GLOW_LAYERS) {
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-          path.setAttribute('points', pointsAttr);
-          path.setAttribute('fill', 'none');
-          path.setAttribute('stroke', this.month.color);
-          path.setAttribute('stroke-width', String(layer.width));
-          path.setAttribute('stroke-linecap', 'round');
-          path.setAttribute('stroke-linejoin', 'round');
-          path.setAttribute('opacity', String(layer.opacity));
-          this.svg.appendChild(path);
+        const NON_FACING_OPACITY_MULTIPLIER = 0.25;
+
+        if (this.facadeRange) {
+          const runs = splitByFacing(this.month.points, this.facadeRange);
+          for (const run of runs) {
+            const runPoints = offsetPoints.slice(run.start, run.end + 1);
+            if (runPoints.length < 2) continue;
+            const runPointsAttr = runPoints.map((p) => `${p.x},${p.y}`).join(' ');
+            const opacityMul = run.facing ? 1 : NON_FACING_OPACITY_MULTIPLIER;
+            for (const layer of GLOW_LAYERS) {
+              const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+              path.setAttribute('points', runPointsAttr);
+              path.setAttribute('fill', 'none');
+              path.setAttribute('stroke', this.month.color);
+              path.setAttribute('stroke-width', String(layer.width));
+              path.setAttribute('stroke-linecap', 'round');
+              path.setAttribute('stroke-linejoin', 'round');
+              path.setAttribute('opacity', String(layer.opacity * opacityMul));
+              this.svg.appendChild(path);
+            }
+          }
+
+          // Transparent pie-slice hugging the actual sun-path curve within
+          // the facing range (not a plain circular sector) -- same
+          // construction as the month-color wedge above, just filtered to
+          // the facing points and drawn with a much lighter, near-white
+          // fill so it reads as a boundary marker, not a second wedge
+          // competing with the month's own color.
+          const facingRun = runs.find((r) => r.facing);
+          if (facingRun) {
+            const facingPoints = offsetPoints.slice(facingRun.start, facingRun.end + 1);
+            if (facingPoints.length > 1) {
+              const facingD = `M ${center.x},${center.y} L ${facingPoints.map((p) => `${p.x},${p.y}`).join(' L ')} Z`;
+              const facingSlice = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+              facingSlice.setAttribute('d', facingD);
+              facingSlice.setAttribute('fill', '#fff');
+              facingSlice.setAttribute('fill-opacity', '0.18');
+              facingSlice.setAttribute('stroke', 'none');
+              this.svg.appendChild(facingSlice);
+            }
+          }
+        } else {
+          for (const layer of GLOW_LAYERS) {
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+            path.setAttribute('points', pointsAttr);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', this.month.color);
+            path.setAttribute('stroke-width', String(layer.width));
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            path.setAttribute('opacity', String(layer.opacity));
+            this.svg.appendChild(path);
+          }
         }
 
         this.svg.appendChild(buildSunMarker(offsetPoints[0], this.month.sunrise, true, this.month.timeZone));
         this.svg.appendChild(buildSunMarker(offsetPoints[offsetPoints.length - 1], this.month.sunset, false, this.month.timeZone));
+
+        if (this.facadeRange) {
+          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.startAzimuthDeg, this.month.points, this.month.timeZone, () => {}));
+          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.endAzimuthDeg, this.month.points, this.month.timeZone, () => {}));
+        }
       }
 
       // computeNowPoint() (js/sun-year.js) already returns null for every
@@ -448,6 +525,84 @@ function buildNowLabel(point, center, tangent, timeText) {
   text.setAttribute('fill', '#333');
   text.textContent = timeText;
   g.appendChild(text);
+
+  return g;
+}
+
+// Past the compass ring (SUN_OVERLAY_RADIUS + 38) so the facade handles
+// have their own clear grab zone, not overlapping the ring visually.
+const FACADE_HANDLE_RADIUS = SUN_OVERLAY_RADIUS + 45;
+
+// Builds one draggable-looking edge of the facade field-of-view pie slice:
+// a dashed line from center out past the rim (see FACADE_HANDLE_RADIUS),
+// with a wide invisible hit-line underneath for a forgiving grab/touch
+// target (the visible 2px dashed line is too thin to reliably grab,
+// especially on mobile), and a time-label pill at the outer tip -- placed
+// there deliberately (not at the arc crossing) so it lines up with the
+// existing sunrise/sunset badges at first, before any dragging: same
+// underlying measurement, same place, so the connection is obvious.
+// `onPointerDown(event, hitLineElement)` is called on the hit-line's own
+// pointerdown (Task 3 wires the actual drag there).
+function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('class', 'facade-handle');
+
+  const azimuthRad = (azimuthDeg * Math.PI) / 180;
+  const tipX = center.x + FACADE_HANDLE_RADIUS * Math.sin(azimuthRad);
+  const tipY = center.y - FACADE_HANDLE_RADIUS * Math.cos(azimuthRad);
+
+  const hitLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  hitLine.setAttribute('x1', String(center.x));
+  hitLine.setAttribute('y1', String(center.y));
+  hitLine.setAttribute('x2', String(tipX));
+  hitLine.setAttribute('y2', String(tipY));
+  hitLine.setAttribute('stroke', 'transparent');
+  hitLine.setAttribute('stroke-width', '24');
+  hitLine.style.pointerEvents = 'auto'; // re-enables interaction under the div's own pointer-events:none (see onAdd())
+  hitLine.style.cursor = 'grab';
+  hitLine.addEventListener('pointerdown', (e) => {
+    e.stopPropagation(); // stop the map underneath from starting its own drag/pan
+    e.preventDefault();
+    onPointerDown(e, hitLine);
+  });
+  g.appendChild(hitLine);
+
+  const visibleLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  visibleLine.setAttribute('x1', String(center.x));
+  visibleLine.setAttribute('y1', String(center.y));
+  visibleLine.setAttribute('x2', String(tipX));
+  visibleLine.setAttribute('y2', String(tipY));
+  visibleLine.setAttribute('stroke', '#333');
+  visibleLine.setAttribute('stroke-width', '2');
+  visibleLine.setAttribute('stroke-dasharray', '5 4');
+  g.appendChild(visibleLine);
+
+  const time = findTimeForAzimuth(points, azimuthDeg);
+  if (time) {
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    label.setAttribute('transform', `translate(${tipX}, ${tipY})`);
+
+    const pill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    pill.setAttribute('x', '-17');
+    pill.setAttribute('y', '-8');
+    pill.setAttribute('width', '34');
+    pill.setAttribute('height', '16');
+    pill.setAttribute('rx', '8');
+    pill.setAttribute('fill', '#fff');
+    label.appendChild(pill);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', '0');
+    text.setAttribute('y', '4');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('font-size', '11');
+    text.setAttribute('font-weight', '600');
+    text.setAttribute('fill', '#333');
+    text.textContent = formatTime(time, timeZone);
+    label.appendChild(text);
+
+    g.appendChild(label);
+  }
 
   return g;
 }
