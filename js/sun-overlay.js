@@ -392,29 +392,31 @@ function buildSunMarker(point, time, isSunrise, timeZone) {
 }
 
 // Builds the small "HH:MM" pill shown next to the pulsing now-dot (see the
-// `sun-now-dot` circle in render()). Unlike buildSunMarker()'s badges --
-// which sit at the arc's two fixed endpoints and can lay out their icon +
-// text around a local origin -- this dot can land anywhere along the arc
-// depending on the time of day. A fixed diagonal offset used to place the
-// pill, but since the arc curves around `center`, a fixed direction points
-// straight across the arc itself for some dot positions (confirmed: the
-// pill sat on top of the arc line as the dot approached sunset). Instead,
-// push the pill outward along the center->dot radial direction, same
-// direction the dot itself is already offset from center, so it always
-// lands clear of the arc regardless of where along it the dot sits.
-// `point` must already be offset by SUN_OVERLAY_MARGIN, same convention as
-// the dot's own cx/cy; `center` is the overlay's center in that same
+// `sun-now-dot` circle in render()). The wedge fill (render()) covers every
+// radius from `center` out to the rim across the whole sunrise-to-sunset
+// angular span, so the dot itself can sit anywhere from near-center (solar
+// noon) to right at the rim (near sunrise/sunset) depending on the time of
+// day. A first attempt pushed the pill a fixed distance out FROM THE DOT,
+// which only clears the wedge once the dot is already close to the rim --
+// confirmed live: it still sat inside the wedge in the middle of the
+// afternoon, well before sunset, since dot-radius + 19px was still well
+// under the rim. Instead, keep the dot's angle (its direction from center)
+// but place the pill at a FIXED radius just past the rim -- same treatment
+// as buildCompassLabels()'s N/Ø/S/V ring, so it always clears the wedge and
+// the arc regardless of what time of day the dot itself sits at. `point`
+// must already be offset by SUN_OVERLAY_MARGIN, same convention as the
+// dot's own cx/cy; `center` is the overlay's center in that same
 // coordinate space (this.center).
 function buildNowLabel(point, center, timeText) {
-  const NOW_LABEL_DISTANCE = 19; // px outward from the dot, matches the old fixed offset's magnitude (hypot(14,14) ~= 19.8)
+  const LABEL_RADIUS = SUN_OVERLAY_RADIUS + 22; // just past the rim (wedge/arc max out at SUN_OVERLAY_RADIUS), short of the compass ring at +38
   const PILL_WIDTH = 34;
   const PILL_HEIGHT = 16;
 
   const dx = point.x - center.x;
   const dy = point.y - center.y;
   const dist = Math.hypot(dx, dy) || 1;
-  const labelX = point.x + (dx / dist) * NOW_LABEL_DISTANCE;
-  const labelY = point.y + (dy / dist) * NOW_LABEL_DISTANCE;
+  const labelX = center.x + (dx / dist) * LABEL_RADIUS;
+  const labelY = center.y + (dy / dist) * LABEL_RADIUS;
 
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('transform', `translate(${labelX}, ${labelY})`);
