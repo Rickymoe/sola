@@ -185,7 +185,7 @@ function createSunPathOverlay() {
         dot.setAttribute('stroke-width', '2');
         dot.setAttribute('class', 'sun-now-dot');
         this.svg.appendChild(dot);
-        this.svg.appendChild(buildNowLabel({ x: dotX, y: dotY }, formatTime(now, this.month.timeZone)));
+        this.svg.appendChild(buildNowLabel({ x: dotX, y: dotY }, this.center, formatTime(now, this.month.timeZone)));
       }
 
       if (this.heading !== null) {
@@ -395,17 +395,29 @@ function buildSunMarker(point, time, isSunrise, timeZone) {
 // `sun-now-dot` circle in render()). Unlike buildSunMarker()'s badges --
 // which sit at the arc's two fixed endpoints and can lay out their icon +
 // text around a local origin -- this dot can land anywhere along the arc
-// depending on the time of day, so the label uses a plain fixed pixel
-// offset from the dot instead. `point` must already be offset by
-// SUN_OVERLAY_MARGIN, same convention as the dot's own cx/cy.
-function buildNowLabel(point, timeText) {
-  const NOW_LABEL_OFFSET_X = 14;
-  const NOW_LABEL_OFFSET_Y = 14;
+// depending on the time of day. A fixed diagonal offset used to place the
+// pill, but since the arc curves around `center`, a fixed direction points
+// straight across the arc itself for some dot positions (confirmed: the
+// pill sat on top of the arc line as the dot approached sunset). Instead,
+// push the pill outward along the center->dot radial direction, same
+// direction the dot itself is already offset from center, so it always
+// lands clear of the arc regardless of where along it the dot sits.
+// `point` must already be offset by SUN_OVERLAY_MARGIN, same convention as
+// the dot's own cx/cy; `center` is the overlay's center in that same
+// coordinate space (this.center).
+function buildNowLabel(point, center, timeText) {
+  const NOW_LABEL_DISTANCE = 19; // px outward from the dot, matches the old fixed offset's magnitude (hypot(14,14) ~= 19.8)
   const PILL_WIDTH = 34;
   const PILL_HEIGHT = 16;
 
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const labelX = point.x + (dx / dist) * NOW_LABEL_DISTANCE;
+  const labelY = point.y + (dy / dist) * NOW_LABEL_DISTANCE;
+
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  g.setAttribute('transform', `translate(${point.x + NOW_LABEL_OFFSET_X}, ${point.y + NOW_LABEL_OFFSET_Y})`);
+  g.setAttribute('transform', `translate(${labelX}, ${labelY})`);
 
   const pill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
   pill.setAttribute('x', String(-PILL_WIDTH / 2));
