@@ -21,34 +21,30 @@ function sunPolarToXY(azimuthDeg, altitudeDeg) {
   };
 }
 
-// Solar position "right now" mapped into the overlay's own polar
-// coordinate space (same convention as sunPolarToXY: origin at the
+// Solar position at an arbitrary instant, mapped into the overlay's own
+// polar coordinate space (same convention as sunPolarToXY: origin at the
 // overlay's center, not yet offset by SUN_OVERLAY_MARGIN -- the caller in
 // js/sun-overlay.js applies that same offset it already applies to every
-// other point). Returns null whenever there's nothing to draw: `month`
-// isn't the one representing today (see isToday in getMonthlyOverview
-// above), no position is pinned yet, or the sun is currently below the
-// horizon (night). Takes `now` as a parameter (defaulting to the real
-// clock) purely so it can be tested with a fixed instant instead of
-// depending on wall-clock time.
-function computeNowPoint(month, position, now = new Date()) {
-  if (!month || !month.isToday || !position) return null;
-  const { azimuthDeg, altitudeDeg } = getSunPosition(now, position.lat, position.lng);
+// other point). Returns null if the sun is below the horizon at that
+// instant. Pure function of position+date -- no month/"is this today"
+// gating, unlike computeNowPoint() below, which layers that gating on top
+// of this for the live "now" dot. Used directly by the day-scrubbing time
+// slider (js/app.js), which has no such gating -- any month, any day, any
+// time is valid there.
+function computeSunPointAt(position, date) {
+  if (!position) return null;
+  const { azimuthDeg, altitudeDeg } = getSunPosition(date, position.lat, position.lng);
   if (altitudeDeg < 0) return null;
   const point = sunPolarToXY(azimuthDeg, altitudeDeg);
 
-  // Direction of travel along the arc at `now`, used by buildNowLabel()
-  // (js/sun-overlay.js) to offset the time label perpendicular to the
-  // curve itself rather than radially from the overlay's center. A radial
-  // offset only clears the wedge once the sun is already low: mid-
-  // afternoon, with the sun still high (small radius from center), a small
-  // radial push left the label deep inside the wedge, and pinning it to a
-  // fixed radius past the rim instead left it looking disconnected from
-  // the dot. Sampling a few minutes ahead and taking the direction to that
-  // point gives the curve's actual local direction, so a small
-  // perpendicular push reliably clears just the stroke, at any time of day.
+  // Direction of travel at `date`, used by buildNowLabel() (js/sun-overlay.js)
+  // to offset the time label perpendicular to the curve itself rather than
+  // radially from the overlay's center -- a radial offset only clears the
+  // wedge once the sun is already low, and a fixed radius past the rim
+  // looks disconnected from the dot when the dot itself is far from the
+  // rim (both confirmed live during the "now" dot's own earlier iteration).
   const TANGENT_STEP_MINUTES = 5;
-  const later = new Date(now.getTime() + TANGENT_STEP_MINUTES * 60000);
+  const later = new Date(date.getTime() + TANGENT_STEP_MINUTES * 60000);
   const laterSun = getSunPosition(later, position.lat, position.lng);
   const laterPoint = sunPolarToXY(laterSun.azimuthDeg, laterSun.altitudeDeg);
   const tangentDx = laterPoint.x - point.x;
@@ -61,6 +57,18 @@ function computeNowPoint(month, position, now = new Date()) {
     tangentX: tangentDx / tangentLen,
     tangentY: tangentDy / tangentLen,
   };
+}
+
+// Solar position "right now" mapped into the overlay's own polar
+// coordinate space -- returns null whenever there's nothing to draw:
+// `month` isn't the one representing today (see isToday in
+// getMonthlyOverview above), no position is pinned yet, or the sun is
+// currently below the horizon (night). Takes `now` as a parameter
+// (defaulting to the real clock) purely so it can be tested with a fixed
+// instant instead of depending on wall-clock time.
+function computeNowPoint(month, position, now = new Date()) {
+  if (!month || !month.isToday || !position) return null;
+  return computeSunPointAt(position, now);
 }
 
 // Finds the Date where altitude crosses 0° between two consecutive
@@ -114,6 +122,37 @@ function clampAzimuthToArc(candidateAzimuthDeg, startAzimuthDeg, endAzimuthDeg) 
   return distToStart <= distToEnd ? startAzimuthDeg : endAzimuthDeg;
 }
 
+// Index of the point closest to the overlay's own center (== lowest
+// radius == highest altitude, per sunPolarToXY's own mapping) -- i.e.
+// solar noon for that day, found geometrically rather than by comparing
+// azimuth to a fixed value like 180, so it works regardless of hemisphere
+// or which way the day's azimuth sweep wraps. Shared by
+// findTimeForAzimuth() (splits its rising/setting-half search at this
+// point) and findPeakTime() below (the day slider's default time-of-day).
+function findPeakIndex(points) {
+  let peakIndex = 0;
+  let peakDistSq = Infinity;
+  for (let i = 0; i < points.length; i++) {
+    const dx = points[i].x - SUN_OVERLAY_RADIUS;
+    const dy = points[i].y - SUN_OVERLAY_RADIUS;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < peakDistSq) {
+      peakDistSq = distSq;
+      peakIndex = i;
+    }
+  }
+  return peakIndex;
+}
+
+// The Date of solar noon for one day's sampled points -- used as the
+// day-scrubbing time slider's default position (js/app.js) whenever the
+// day slider moves, since sunrise/sunset shift day to day and a fraction
+// carried over from the previous day wouldn't necessarily still land on
+// solar noon.
+function findPeakTime(points) {
+  return points[findPeakIndex(points)].t;
+}
+
 // Finds the Date the sun crosses a given azimuth along one day's arc, by
 // linearly interpolating between the two chronologically-adjacent points
 // (in `points`, as returned by sampleDayArc -- already time-ordered) whose
@@ -142,18 +181,7 @@ function clampAzimuthToArc(candidateAzimuthDeg, startAzimuthDeg, endAzimuthDeg) 
 // this works regardless of hemisphere or which way the day's azimuth
 // sweep wraps.
 function findTimeForAzimuth(points, azimuthDeg, edge) {
-  let peakIndex = 0;
-  let peakDistSq = Infinity;
-  for (let i = 0; i < points.length; i++) {
-    const dx = points[i].x - SUN_OVERLAY_RADIUS;
-    const dy = points[i].y - SUN_OVERLAY_RADIUS;
-    const distSq = dx * dx + dy * dy;
-    if (distSq < peakDistSq) {
-      peakDistSq = distSq;
-      peakIndex = i;
-    }
-  }
-
+  const peakIndex = findPeakIndex(points);
   const searchStart = edge === 'end' ? Math.max(peakIndex, 1) : 1;
   const searchEnd = edge === 'start' ? peakIndex : points.length - 1;
 
