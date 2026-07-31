@@ -336,8 +336,8 @@ function createSunPathOverlay() {
 
         if (this.facadeRange) {
           const edgeTimes = { facadeRange: this.facadeRange, sunrise: this.month.sunrise, sunset: this.month.sunset };
-          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.startAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('start', e, hitLine), edgeTimes));
-          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.endAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('end', e, hitLine), edgeTimes));
+          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.startAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('start', e, hitLine), edgeTimes, 'start'));
+          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.endAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('end', e, hitLine), edgeTimes, 'end'));
         }
       }
 
@@ -658,8 +658,17 @@ const FACADE_HANDLE_RADIUS = SUN_OVERLAY_RADIUS + 65;
 // dragged away from its original bound, there's no exact reference time for
 // that new azimuth, so it falls back to `findTimeForAzimuth` as before.
 // `onPointerDown(event, hitLineElement)` is called on the hit-line's own
-// pointerdown (Task 3 wires the actual drag there).
-function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown, edgeTimes) {
+// pointerdown (Task 3 wires the actual drag there) -- and, per live mobile
+// testing, also on the time pill itself: the dashed line is the "correct"
+// handle but not the intuitive one to grab, so the pill (the thing a user
+// actually looks at) starts the same drag. `edge` ('start'/'end') colors
+// the pill gold (matches the sunrise badge) or coral (matches the sunset
+// badge) so the two facade edges read as "the sunrise-side one" and "the
+// sunset-side one" at a glance, same convention as buildSunMarker's own
+// isSunrise-colored backdrop -- this is about which edge of the facade's
+// field of view it is, not whether it's still sitting at its original
+// (undragged) sunrise/sunset azimuth, so the color doesn't change on drag.
+function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown, edgeTimes, edge) {
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('class', 'facade-handle');
 
@@ -706,13 +715,32 @@ function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown, 
     const label = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     label.setAttribute('transform', `translate(${tipX}, ${tipY})`);
 
+    // Wider invisible hit-rect first (same forgiving-touch-target trick as
+    // the hit-line above) -- the visible pill is only 34x16, comfortably
+    // clickable with a mouse but tight for a fingertip.
+    const pillHit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    pillHit.setAttribute('x', '-22');
+    pillHit.setAttribute('y', '-15');
+    pillHit.setAttribute('width', '44');
+    pillHit.setAttribute('height', '30');
+    pillHit.setAttribute('fill', 'transparent');
+    pillHit.style.pointerEvents = 'auto';
+    pillHit.style.cursor = 'grab';
+    pillHit.style.touchAction = 'none';
+    pillHit.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      onPointerDown(e, pillHit);
+    });
+    label.appendChild(pillHit);
+
     const pill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     pill.setAttribute('x', '-17');
     pill.setAttribute('y', '-8');
     pill.setAttribute('width', '34');
     pill.setAttribute('height', '16');
     pill.setAttribute('rx', '8');
-    pill.setAttribute('fill', '#fff');
+    pill.setAttribute('fill', edge === 'start' ? '#ffe29a' : '#ffab7a');
     label.appendChild(pill);
 
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
