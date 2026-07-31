@@ -41,6 +41,7 @@ function createSunPathOverlay() {
       this.headingArrowGroup = null; // the <g> built by render(), rotated directly by setHeading()'s fast path
       this.facadeRange = null; // { startAzimuthDeg, endAzimuthDeg, originalStartAzimuthDeg, originalEndAzimuthDeg, seedStartAzimuthDeg, seedEndAzimuthDeg, createdMonthName } or null -- see activateFacadeRange()
       this._facadeRenderPending = false; // true while a scheduleFacadeRender() rAF callback is queued, so pointer moves don't stack up extra render() calls
+      this.scrubDate = null; // Date or null -- set via setScrubDate(), the day-scrubbing time slider's chosen instant for a NON-current month (js/app.js). Ignored while this.month.isToday: the live "now" dot takes priority there -- see render()'s dot section.
     }
 
     onAdd() {
@@ -128,6 +129,20 @@ function createSunPathOverlay() {
     clearHeading() {
       this.heading = null;
       this.headingArrowGroup = null;
+      this.render();
+    }
+
+    // Sets the fixed (non-pulsing) scrub dot's instant -- used for any
+    // month except the current one, where the sliders (js/app.js) are the
+    // only way to place a dot at all (there's no "now" for a month that
+    // isn't this one).
+    setScrubDate(date) {
+      this.scrubDate = date;
+      this.render();
+    }
+
+    clearScrubDate() {
+      this.scrubDate = null;
       this.render();
     }
 
@@ -402,17 +417,29 @@ function createSunPathOverlay() {
         }
       }
 
-      // computeNowPoint() (js/sun-year.js) already returns null for every
-      // case where nothing should be drawn (not today's month, no
-      // position, or night), so no extra guard is needed here. `now` is
-      // captured once here and reused for the time label below so the dot's
-      // position and its label can never disagree by straddling a minute
-      // boundary across two separate `new Date()` calls.
-      const now = new Date();
-      const nowPoint = computeNowPoint(this.month, this.position, now);
-      if (nowPoint) {
-        const dotX = nowPoint.x + SUN_OVERLAY_MARGIN;
-        const dotY = nowPoint.y + SUN_OVERLAY_MARGIN;
+      // Two mutually exclusive sources for the arc's time-dot: the live
+      // "now" dot (current month only, pulses, always the real wall-clock
+      // time) takes priority; otherwise a scrubDate set by the day/time
+      // sliders (js/app.js) for any OTHER month draws a fixed, non-pulsing
+      // dot instead. Both share the exact same drawing code below --
+      // `pulsing` is the only difference, since a scrub position is a
+      // deliberate "what if" choice, not a live status.
+      let dotPoint = null;
+      let dotDate = null;
+      let pulsing = false;
+
+      if (this.month && this.month.isToday) {
+        dotDate = new Date();
+        dotPoint = computeNowPoint(this.month, this.position, dotDate);
+        pulsing = true;
+      } else if (this.month && this.scrubDate) {
+        dotDate = this.scrubDate;
+        dotPoint = computeSunPointAt(this.position, dotDate);
+      }
+
+      if (dotPoint) {
+        const dotX = dotPoint.x + SUN_OVERLAY_MARGIN;
+        const dotY = dotPoint.y + SUN_OVERLAY_MARGIN;
         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         dot.setAttribute('cx', String(dotX));
         dot.setAttribute('cy', String(dotY));
@@ -423,10 +450,10 @@ function createSunPathOverlay() {
         // without this: same rgb() fill sitting on the same-hue wedge/glow).
         dot.setAttribute('stroke', '#fff');
         dot.setAttribute('stroke-width', '2');
-        dot.setAttribute('class', 'sun-now-dot');
+        if (pulsing) dot.setAttribute('class', 'sun-now-dot');
         this.svg.appendChild(dot);
-        const tangent = { x: nowPoint.tangentX, y: nowPoint.tangentY };
-        this.svg.appendChild(buildNowLabel({ x: dotX, y: dotY }, this.center, tangent, formatTime(now, this.month.timeZone)));
+        const tangent = { x: dotPoint.tangentX, y: dotPoint.tangentY };
+        this.svg.appendChild(buildNowLabel({ x: dotX, y: dotY }, this.center, tangent, formatTime(dotDate, this.month.timeZone)));
       }
 
       if (this.heading !== null) {
