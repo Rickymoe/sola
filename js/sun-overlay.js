@@ -721,7 +721,7 @@ function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown, 
   } else if (azimuthDeg === edgeTimes.facadeRange.originalEndAzimuthDeg) {
     time = edgeTimes.sunset;
   } else {
-    time = findTimeForAzimuth(points, azimuthDeg);
+    time = findTimeForAzimuth(points, azimuthDeg, edge);
   }
   // Always drawn, even when `time` is null (this fixed bearing doesn't
   // occur anywhere on the CURRENT month's arc -- e.g. dragged to a bearing

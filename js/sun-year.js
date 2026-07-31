@@ -124,8 +124,40 @@ function clampAzimuthToArc(candidateAzimuthDeg, startAzimuthDeg, endAzimuthDeg) 
 // sun passing north of zenith -- true for the southern hemisphere and much
 // of the tropics) still interpolates correctly instead of producing a wildly
 // wrong fraction.
-function findTimeForAzimuth(points, azimuthDeg) {
-  for (let i = 1; i < points.length; i++) {
+//
+// `edge` ('start'/'end'/omitted) restricts which half of the day is
+// searched: 'start' only the rising portion (sunrise to solar noon), 'end'
+// only the setting portion (solar noon to sunset). Without this, a facade
+// handle's FIXED bearing, re-mapped onto a different month's much narrower
+// arc, could end up crossed only on the chronologically WRONG side of the
+// day for that handle's role -- confirmed live: dragging the sunset-side
+// handle onto a bearing that new month only crosses in the MORNING showed
+// a morning time in the sunset-colored pill, which reads as backwards
+// regardless of it being a technically real crossing. Restricting the
+// search to the matching half means that "wrong side" case correctly
+// finds no crossing and falls back to null ("-") instead. The solar-noon
+// split point is found as whichever point sits CLOSEST TO THE OVERLAY'S
+// OWN CENTER (== lowest radius == highest altitude, per sunPolarToXY's own
+// mapping) rather than by comparing azimuth to a fixed value like 180 --
+// this works regardless of hemisphere or which way the day's azimuth
+// sweep wraps.
+function findTimeForAzimuth(points, azimuthDeg, edge) {
+  let peakIndex = 0;
+  let peakDistSq = Infinity;
+  for (let i = 0; i < points.length; i++) {
+    const dx = points[i].x - SUN_OVERLAY_RADIUS;
+    const dy = points[i].y - SUN_OVERLAY_RADIUS;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < peakDistSq) {
+      peakDistSq = distSq;
+      peakIndex = i;
+    }
+  }
+
+  const searchStart = edge === 'end' ? Math.max(peakIndex, 1) : 1;
+  const searchEnd = edge === 'start' ? peakIndex : points.length - 1;
+
+  for (let i = searchStart; i <= searchEnd; i++) {
     const prev = points[i - 1];
     const cur = points[i];
     const span = ((cur.azimuthDeg - prev.azimuthDeg + 540) % 360) - 180;
