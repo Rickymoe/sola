@@ -119,6 +119,18 @@ function createSunPathOverlay() {
       }
     }
 
+    // Turns the heading needle off (user toggled the compass button back
+    // off), as distinct from clear() -- everything else on the overlay
+    // (position, month, facade range) stays exactly as it was. A full
+    // render() is needed (not the setHeading() fast path) since removing
+    // the arrow means the stale <g> must actually be dropped from the SVG,
+    // not just have its transform rewritten.
+    clearHeading() {
+      this.heading = null;
+      this.headingArrowGroup = null;
+      this.render();
+    }
+
     clear() {
       this.position = null;
       this.month = null;

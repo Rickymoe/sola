@@ -206,12 +206,16 @@ function updateClearButtonVisibility() {
   document.getElementById('clear-position-btn').classList.toggle('hidden', !currentPosition);
 }
 
-// Hidden once compass tracking is already on (no point re-prompting for
-// permission), and whenever there's no pinned point to show a needle at.
+// Hidden whenever the device doesn't support it or there's no pinned point
+// to show a needle at -- but stays visible (not hidden) once compass
+// tracking is on, styled with an .active state instead, so the user can
+// toggle it back off. Previously hid itself once active, leaving no way to
+// turn the needle off short of clearing the whole position.
 function updateCompassButtonVisibility() {
   const btn = document.getElementById('compass-btn');
   if (!btn) return;
-  btn.classList.toggle('hidden', !supportsCompass() || !currentPosition || compassActive);
+  btn.classList.toggle('hidden', !supportsCompass() || !currentPosition);
+  btn.classList.toggle('active', compassActive);
 }
 
 function updateFacadeButtonVisibility() {
@@ -269,6 +273,17 @@ function setupLocationControls() {
   });
 
   compassBtn.addEventListener('click', () => {
+    if (compassActive) {
+      if (stopCompassHeading) {
+        stopCompassHeading();
+        stopCompassHeading = null;
+      }
+      compassActive = false;
+      if (sunOverlay) sunOverlay.clearHeading();
+      updateCompassButtonVisibility();
+      return;
+    }
+
     startCompassHeading((heading) => {
       if (sunOverlay) sunOverlay.setHeading(heading);
     }).then((stopFn) => {

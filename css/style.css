@@ -59,6 +59,14 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   background: #f5f5f5;
 }
 
+/* Toggled-on state (e.g. the compass button once heading tracking is
+   active) -- same blue accent as the position marker/heading needle
+   (#4285f4), so "on" reads consistently across the app. */
+.icon-btn.active {
+  background: #e8f0fe;
+  border-color: #4285f4;
+}
+
 .icon-btn svg {
   width: 22px;
   height: 22px;
