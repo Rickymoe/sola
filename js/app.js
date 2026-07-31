@@ -7,6 +7,9 @@ let selectedMonthIndex = new Date().getMonth();
 let compassActive = false;
 let stopCompassHeading = null;
 let facadeActive = false; // mirrors whether sunOverlay.facadeRange is set -- tracked as a top-level flag to match the existing compassActive convention
+let selectedDay = 15; // 1-31, day-of-month for the day slider (non-current months only) -- always resets to 15 when a new month is selected, matching the app's existing "representative day" default
+let selectedTimeFraction = 0.5; // 0-1, position between that day's sunrise/sunset (or full 24h span on a polar day) for the time slider -- reset to that day's own solar noon whenever the day slider moves
+let currentDayMonth = null; // the day-specific month-like object (points/sunrise/sunset recomputed for selectedDay via sampleDayArc()), set by applySelectedDay() -- read by the time slider's own input handler and by applySelectedTime() for the current sunrise/sunset bounds; null for the current month (sliders hidden, not used) or when no position is pinned
 
 const DEFAULT_CENTER = { lat: 59.9139, lng: 10.7522 }; // Oslo
 
@@ -25,6 +28,28 @@ function supportsCompass() {
   } catch (_) {
     return false;
   }
+}
+
+// Last day-of-month for the given 0-indexed month/year -- day 0 of the
+// FOLLOWING month is the last day of THIS month, a standard JS Date trick.
+function daysInMonth(monthIndex, year) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+// The time slider's [start, end] Date bounds for one day-specific month-like
+// object: that day's own sunrise-to-sunset window normally, or the full
+// sampled range (close to a full 24h local day) on a polar day (sunrise/
+// sunset both null, matching sampleDayArc()'s own convention). Returns null
+// if there aren't even 2 points to bound a range with (deep polar night --
+// no daylight at all that day).
+function timeSliderBounds(dayMonth) {
+  if (dayMonth.sunrise && dayMonth.sunset) {
+    return { start: dayMonth.sunrise, end: dayMonth.sunset };
+  }
+  if (dayMonth.points.length > 1) {
+    return { start: dayMonth.points[0].t, end: dayMonth.points[dayMonth.points.length - 1].t };
+  }
+  return null;
 }
 
 // Called by Google Maps if the API key is rejected (billing, referrer, etc.).
@@ -105,7 +130,7 @@ function setPosition(lat, lng) {
   const timeZone = tzlookup(lat, lng);
   months = getMonthlyOverview(lat, lng, new Date().getFullYear(), timeZone);
   renderMonthButtons();
-  if (sunOverlay) sunOverlay.setMonth(months[selectedMonthIndex]);
+  selectMonth(selectedMonthIndex);
   updateClearButtonVisibility();
   updateCompassButtonVisibility();
   updateFacadeButtonVisibility();
@@ -186,6 +211,9 @@ function clearPosition() {
   months = null;
   if (sunOverlay) sunOverlay.clear();
   facadeActive = false;
+  currentDayMonth = null;
+  document.getElementById('day-slider-row').classList.add('hidden');
+  document.getElementById('time-slider-row').classList.add('hidden');
   document.getElementById('month-buttons-container').innerHTML = '';
   document.getElementById('sunrise-anim').classList.add('hidden');
   if (sunriseAnimFrame) {
@@ -245,7 +273,79 @@ function selectMonth(i) {
     btn.classList.remove('active');
   }
   document.querySelectorAll('.month-btn')[i].classList.add('active');
-  if (sunOverlay && months) sunOverlay.setMonth(months[i]);
+
+  const mo = months[i];
+  const dayRow = document.getElementById('day-slider-row');
+  const timeRow = document.getElementById('time-slider-row');
+
+  if (mo.isToday) {
+    // Current month: completely unaffected by this feature -- no sliders,
+    // the existing live "now" dot (js/sun-overlay.js's own isToday check)
+    // takes over entirely.
+    dayRow.classList.add('hidden');
+    timeRow.classList.add('hidden');
+    currentDayMonth = null;
+    if (sunOverlay) sunOverlay.clearScrubDate();
+    if (sunOverlay) sunOverlay.setMonth(mo);
+    return;
+  }
+
+  dayRow.classList.remove('hidden');
+  timeRow.classList.remove('hidden');
+
+  selectedDay = 15;
+  const daySlider = document.getElementById('day-slider');
+  daySlider.max = String(daysInMonth(i, new Date().getFullYear()));
+  daySlider.value = '15';
+
+  applySelectedDay();
+}
+
+// Re-samples the arc for `selectedDay` within the currently selected
+// month (via sampleDayArc(), the same function getMonthlyOverview() already
+// uses for the fixed 15th) and hands the result to the overlay exactly like
+// any other month -- render() doesn't know or care that this "month" only
+// represents one specific day instead of the whole month. Also resets the
+// time slider to that new day's own solar noon, since sunrise/sunset shift
+// day to day and a fraction carried over from the previous day wouldn't
+// necessarily still land on solar noon. No-op for the current month --
+// sliders are hidden there and this should never be reachable.
+function applySelectedDay() {
+  if (!currentPosition || !months) return;
+  const mo = months[selectedMonthIndex];
+  if (mo.isToday) return;
+
+  const year = new Date().getFullYear();
+  const { points, sunrise, sunset } = sampleDayArc(
+    year, selectedMonthIndex, selectedDay,
+    currentPosition.lat, currentPosition.lng, mo.timeZone
+  );
+  currentDayMonth = { ...mo, points, sunrise, sunset };
+
+  document.getElementById('day-slider-value').textContent = `${selectedDay}.`;
+  if (sunOverlay) sunOverlay.setMonth(currentDayMonth);
+
+  const bounds = timeSliderBounds(currentDayMonth);
+  if (bounds && points.length > 1) {
+    const peak = findPeakTime(points);
+    selectedTimeFraction = (peak.getTime() - bounds.start.getTime()) / (bounds.end.getTime() - bounds.start.getTime());
+  } else {
+    selectedTimeFraction = 0.5;
+  }
+  document.getElementById('time-slider').value = String(Math.round(selectedTimeFraction * 1000));
+  applySelectedTime();
+}
+
+// Places the scrub dot at `selectedTimeFraction`'s position between
+// currentDayMonth's own time-slider bounds. Safe to call with no bounds
+// (deep polar night) or no overlay -- just does nothing visible.
+function applySelectedTime() {
+  if (!currentDayMonth || !sunOverlay) return;
+  const bounds = timeSliderBounds(currentDayMonth);
+  if (!bounds) return;
+  const date = new Date(bounds.start.getTime() + selectedTimeFraction * (bounds.end.getTime() - bounds.start.getTime()));
+  document.getElementById('time-slider-value').textContent = formatTime(date, currentDayMonth.timeZone);
+  sunOverlay.setScrubDate(date);
 }
 
 function setupLocationControls() {
@@ -314,6 +414,18 @@ function setupLocationControls() {
       facadeActive = !!sunOverlay.facadeRange;
     }
     updateFacadeButtonVisibility();
+  });
+
+  const daySlider = document.getElementById('day-slider');
+  daySlider.addEventListener('input', () => {
+    selectedDay = Number(daySlider.value);
+    applySelectedDay();
+  });
+
+  const timeSlider = document.getElementById('time-slider');
+  timeSlider.addEventListener('input', () => {
+    selectedTimeFraction = Number(timeSlider.value) / 1000;
+    applySelectedTime();
   });
 }
 
