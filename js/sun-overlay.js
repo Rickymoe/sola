@@ -39,7 +39,7 @@ function createSunPathOverlay() {
       // fires at ~60Hz while the compass is active).
       this.center = { x: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN, y: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN };
       this.headingArrowGroup = null; // the <g> built by render(), rotated directly by setHeading()'s fast path
-      this.facadeRange = null; // { startAzimuthDeg, endAzimuthDeg, originalStartAzimuthDeg, originalEndAzimuthDeg, seedStartAzimuthDeg, seedEndAzimuthDeg, createdMonthName } or null -- see activateFacadeRange()
+      this.facadeRange = null; // { startAzimuthDeg, endAzimuthDeg, originalStartAzimuthDeg, originalEndAzimuthDeg, seedStartAzimuthDeg, seedEndAzimuthDeg } or null -- see activateFacadeRange()
       this._facadeRenderPending = false; // true while a scheduleFacadeRender() rAF callback is queued, so pointer moves don't stack up extra render() calls
       this.scrubDate = null; // Date or null -- set via setScrubDate(), the day-scrubbing time slider's chosen instant for a NON-current month (js/app.js). Ignored while this.month.isToday: the live "now" dot takes priority there -- see render()'s dot section.
     }
@@ -152,6 +152,7 @@ function createSunPathOverlay() {
       this.heading = null;
       this.headingArrowGroup = null;
       this.facadeRange = null;
+      this.scrubDate = null;
       if (this.div) this.div.style.display = 'none';
     }
 
@@ -217,11 +218,6 @@ function createSunPathOverlay() {
         // the seeded month).
         seedStartAzimuthDeg: start,
         seedEndAzimuthDeg: end,
-        // Which month this range was seeded from -- render()'s label
-        // shortcut (show the exact sunrise/sunset badge time for an
-        // undragged handle) is only valid while viewing THIS SAME month;
-        // see buildFacadeHandle()'s sameMonth check for why.
-        createdMonthName: this.month.name,
       };
       this.render();
     }
@@ -406,11 +402,13 @@ function createSunPathOverlay() {
         this.svg.appendChild(buildSunMarker(offsetPoints[offsetPoints.length - 1], this.month.sunset, false, this.month.timeZone));
 
         if (this.facadeRange) {
+          const arcBounds = this.arcAzimuthBounds(this.month);
           const edgeTimes = {
             facadeRange: this.facadeRange,
             sunrise: this.month.sunrise,
             sunset: this.month.sunset,
-            sameMonth: this.facadeRange.createdMonthName === this.month.name,
+            sameMonth: arcBounds.start === this.facadeRange.seedStartAzimuthDeg &&
+              arcBounds.end === this.facadeRange.seedEndAzimuthDeg,
           };
           this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.startAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('start', e, hitLine), edgeTimes, 'start'));
           this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.endAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('end', e, hitLine), edgeTimes, 'end'));
@@ -791,16 +789,18 @@ function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown, 
   visibleLine.setAttribute('stroke-dasharray', '5 4');
   g.appendChild(visibleLine);
 
-  // The exact-badge-time shortcut below only holds while viewing the SAME
-  // month the facade range was created in -- an undragged handle's azimuth
-  // still equals its own seedStart/EndAzimuthDeg after switching months
-  // (the bearing itself never changes), but that fixed bearing is
-  // generally nowhere near the NEW month's own sunrise/sunset direction, so
-  // showing this month's badge time there is wrong regardless of whether
-  // the bearing happens to occur this month at all. Confirmed live: an
-  // undragged July-seeded range still showed February's own sunrise/sunset
-  // times while the dashed lines kept pointing at July's (very different)
-  // bearings. Once the month differs from where it was created,
+  // The exact-badge-time shortcut below only holds while the arc's OWN
+  // current azimuth bounds (arcAzimuthBounds()) still match the bounds it
+  // was seeded from -- an undragged handle's azimuth still equals its own
+  // seedStart/EndAzimuthDeg after switching months or days (the bearing
+  // itself never changes), but that fixed bearing is generally nowhere near
+  // the NEW arc's own sunrise/sunset direction, so showing this month's
+  // badge time there is wrong regardless of whether the bearing happens to
+  // occur on this arc at all. Confirmed live: an undragged July-seeded
+  // range still showed February's own sunrise/sunset times while the dashed
+  // lines kept pointing at July's (very different) bearings. Once the arc's
+  // bounds differ from where it was created (a different month, or -- since
+  // the day slider was added -- a different day within the same month),
   // findTimeForAzimuth() is the only correct source of truth. Compares
   // against seedStart/EndAzimuthDeg (the CURRENT month's own bounds at
   // creation), not originalStart/EndAzimuthDeg (the year-wide DRAG CLAMP

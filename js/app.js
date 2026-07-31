@@ -209,6 +209,7 @@ function clearPosition() {
   }
   currentPosition = null;
   months = null;
+  selectedMonthIndex = new Date().getMonth();
   if (sunOverlay) sunOverlay.clear();
   facadeActive = false;
   currentDayMonth = null;
@@ -269,6 +270,7 @@ function renderMonthButtons() {
 
 function selectMonth(i) {
   selectedMonthIndex = i;
+  if (!months) return;
   for (const btn of document.querySelectorAll('.month-btn')) {
     btn.classList.remove('active');
   }
@@ -342,7 +344,11 @@ function applySelectedDay() {
 function applySelectedTime() {
   if (!currentDayMonth || !sunOverlay) return;
   const bounds = timeSliderBounds(currentDayMonth);
-  if (!bounds) return;
+  if (!bounds) {
+    document.getElementById('time-slider-value').textContent = '–';
+    sunOverlay.clearScrubDate();
+    return;
+  }
   const date = new Date(bounds.start.getTime() + selectedTimeFraction * (bounds.end.getTime() - bounds.start.getTime()));
   document.getElementById('time-slider-value').textContent = formatTime(date, currentDayMonth.timeZone);
   sunOverlay.setScrubDate(date);
