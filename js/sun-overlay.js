@@ -723,50 +723,57 @@ function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown, 
   } else {
     time = findTimeForAzimuth(points, azimuthDeg);
   }
-  if (time) {
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    label.setAttribute('transform', `translate(${tipX}, ${tipY})`);
+  // Always drawn, even when `time` is null (this fixed bearing doesn't
+  // occur anywhere on the CURRENT month's arc -- e.g. dragged to a bearing
+  // in July that February's much narrower sun-path never reaches).
+  // Skipping the whole pill in that case used to also silently drop its
+  // drag hit-area, so the handle became un-draggable-by-pill for that
+  // month with no visible explanation -- confirmed live (switching July ->
+  // February made both pills vanish). formatTime() already renders '–' for
+  // a null date, matching how every other time label in this app shows
+  // "no value" -- reuse that instead of hiding the element.
+  const label = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  label.setAttribute('transform', `translate(${tipX}, ${tipY})`);
 
-    // Wider invisible hit-rect first (same forgiving-touch-target trick as
-    // the hit-line above) -- the visible pill is only 34x16, comfortably
-    // clickable with a mouse but tight for a fingertip.
-    const pillHit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    pillHit.setAttribute('x', '-22');
-    pillHit.setAttribute('y', '-15');
-    pillHit.setAttribute('width', '44');
-    pillHit.setAttribute('height', '30');
-    pillHit.setAttribute('fill', 'transparent');
-    pillHit.style.pointerEvents = 'auto';
-    pillHit.style.cursor = 'grab';
-    pillHit.style.touchAction = 'none';
-    pillHit.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      onPointerDown(e, pillHit);
-    });
-    label.appendChild(pillHit);
+  // Wider invisible hit-rect first (same forgiving-touch-target trick as
+  // the hit-line above) -- the visible pill is only 34x16, comfortably
+  // clickable with a mouse but tight for a fingertip.
+  const pillHit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  pillHit.setAttribute('x', '-22');
+  pillHit.setAttribute('y', '-15');
+  pillHit.setAttribute('width', '44');
+  pillHit.setAttribute('height', '30');
+  pillHit.setAttribute('fill', 'transparent');
+  pillHit.style.pointerEvents = 'auto';
+  pillHit.style.cursor = 'grab';
+  pillHit.style.touchAction = 'none';
+  pillHit.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onPointerDown(e, pillHit);
+  });
+  label.appendChild(pillHit);
 
-    const pill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    pill.setAttribute('x', '-17');
-    pill.setAttribute('y', '-8');
-    pill.setAttribute('width', '34');
-    pill.setAttribute('height', '16');
-    pill.setAttribute('rx', '8');
-    pill.setAttribute('fill', edge === 'start' ? '#ffe29a' : '#ffab7a');
-    label.appendChild(pill);
+  const pill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  pill.setAttribute('x', '-17');
+  pill.setAttribute('y', '-8');
+  pill.setAttribute('width', '34');
+  pill.setAttribute('height', '16');
+  pill.setAttribute('rx', '8');
+  pill.setAttribute('fill', edge === 'start' ? '#ffe29a' : '#ffab7a');
+  label.appendChild(pill);
 
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', '0');
-    text.setAttribute('y', '4');
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('font-size', '11');
-    text.setAttribute('font-weight', '600');
-    text.setAttribute('fill', '#333');
-    text.textContent = formatTime(time, timeZone);
-    label.appendChild(text);
+  const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  text.setAttribute('x', '0');
+  text.setAttribute('y', '4');
+  text.setAttribute('text-anchor', 'middle');
+  text.setAttribute('font-size', '11');
+  text.setAttribute('font-weight', '600');
+  text.setAttribute('fill', '#333');
+  text.textContent = formatTime(time, timeZone);
+  label.appendChild(text);
 
-    g.appendChild(label);
-  }
+  g.appendChild(label);
 
   return g;
 }
