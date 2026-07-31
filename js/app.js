@@ -185,7 +185,6 @@ function clearPosition() {
   currentPosition = null;
   months = null;
   if (sunOverlay) sunOverlay.clear();
-  if (sunOverlay) sunOverlay.clearFacadeRange();
   facadeActive = false;
   document.getElementById('month-buttons-container').innerHTML = '';
   document.getElementById('sunrise-anim').classList.add('hidden');
@@ -283,12 +282,20 @@ function setupLocationControls() {
 
   const facadeBtn = document.getElementById('facade-btn');
   facadeBtn.addEventListener('click', () => {
+    if (!sunOverlay) return;
     if (facadeActive) {
       sunOverlay.clearFacadeRange();
       facadeActive = false;
     } else {
       sunOverlay.activateFacadeRange();
-      facadeActive = true;
+      // activateFacadeRange() silently no-ops during polar night (no daylight
+      // arc to seed from -- see its own guard in js/sun-overlay.js), so read
+      // back the overlay's actual resulting state instead of assuming
+      // success: otherwise this flag would desync from reality (the button
+      // would think it's "on" while sunOverlay.facadeRange stays null, so the
+      // next click would call clearFacadeRange(), itself a no-op, instead of
+      // turning anything on).
+      facadeActive = !!sunOverlay.facadeRange;
     }
   });
 }

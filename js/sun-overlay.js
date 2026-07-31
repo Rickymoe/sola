@@ -40,6 +40,7 @@ function createSunPathOverlay() {
       this.center = { x: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN, y: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN };
       this.headingArrowGroup = null; // the <g> built by render(), rotated directly by setHeading()'s fast path
       this.facadeRange = null; // { startAzimuthDeg, endAzimuthDeg, originalStartAzimuthDeg, originalEndAzimuthDeg } or null -- see activateFacadeRange()
+      this._facadeRenderPending = false; // true while a scheduleFacadeRender() rAF callback is queued, so pointer moves don't stack up extra render() calls
     }
 
     onAdd() {
@@ -110,6 +111,7 @@ function createSunPathOverlay() {
       this.month = null;
       this.heading = null;
       this.headingArrowGroup = null;
+      this.facadeRange = null;
       if (this.div) this.div.style.display = 'none';
     }
 
@@ -121,8 +123,18 @@ function createSunPathOverlay() {
     // js/app.js -- but guard here too since this is a public method).
     activateFacadeRange() {
       if (!this.month || this.month.points.length < 2) return;
-      const start = this.month.points[0].azimuthDeg;
-      const end = this.month.points[this.month.points.length - 1].azimuthDeg;
+      const first = this.month.points[0].azimuthDeg;
+      const second = this.month.points[1].azimuthDeg;
+      const last = this.month.points[this.month.points.length - 1].azimuthDeg;
+      // Signed shortest-angle delta (-180..180]: negative means the arc's azimuth
+      // is actually sweeping counter-clockwise sample-to-sample (the sun passes
+      // north of zenith -- true for the southern hemisphere and much of the
+      // tropics), which is the opposite of isAzimuthInRange's clockwise-from-
+      // start-to-end assumption. Swap start/end in that case so the seeded
+      // range still covers the real daylight sweep instead of its complement.
+      const signedDelta = ((second - first + 540) % 360) - 180;
+      const start = signedDelta >= 0 ? first : last;
+      const end = signedDelta >= 0 ? last : first;
       this.facadeRange = {
         startAzimuthDeg: start,
         endAzimuthDeg: end,
@@ -149,6 +161,7 @@ function createSunPathOverlay() {
 
       const onMove = (moveEvent) => {
         if (moveEvent.pointerId !== pointerId) return;
+        if (!this.facadeRange) return; // other hand may have tapped the toggle/clear button mid-drag, clearing the range out from under this drag
         const rect = this.svg.getBoundingClientRect();
         const localX = moveEvent.clientX - rect.left;
         const localY = moveEvent.clientY - rect.top;
@@ -309,8 +322,9 @@ function createSunPathOverlay() {
         this.svg.appendChild(buildSunMarker(offsetPoints[offsetPoints.length - 1], this.month.sunset, false, this.month.timeZone));
 
         if (this.facadeRange) {
-          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.startAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('start', e, hitLine)));
-          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.endAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('end', e, hitLine)));
+          const edgeTimes = { facadeRange: this.facadeRange, sunrise: this.month.sunrise, sunset: this.month.sunset };
+          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.startAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('start', e, hitLine), edgeTimes));
+          this.svg.appendChild(buildFacadeHandle(center, this.facadeRange.endAzimuthDeg, this.month.points, this.month.timeZone, (e, hitLine) => this.startFacadeDrag('end', e, hitLine), edgeTimes));
         }
       }
 
@@ -615,10 +629,19 @@ const FACADE_HANDLE_RADIUS = SUN_OVERLAY_RADIUS + 45;
 // especially on mobile), and a time-label pill at the outer tip -- placed
 // there deliberately (not at the arc crossing) so it lines up with the
 // existing sunrise/sunset badges at first, before any dragging: same
-// underlying measurement, same place, so the connection is obvious.
+// underlying measurement, same place, so the connection is obvious. To make
+// that actually true (not just approximately true), `edgeTimes.facadeRange`
+// is checked against its own ORIGINAL (undragged) bounds: when this handle
+// sits exactly at its original azimuth, the exact `edgeTimes.sunrise`/
+// `edgeTimes.sunset` crossing is used for the label instead of
+// `findTimeForAzimuth`'s coarser interpolation over 10-minute samples --
+// those two can disagree by up to ~10 minutes, which used to make the two
+// "same measurement" badges show different times. Once the handle has been
+// dragged away from its original bound, there's no exact reference time for
+// that new azimuth, so it falls back to `findTimeForAzimuth` as before.
 // `onPointerDown(event, hitLineElement)` is called on the hit-line's own
 // pointerdown (Task 3 wires the actual drag there).
-function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown) {
+function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown, edgeTimes) {
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('class', 'facade-handle');
 
@@ -635,6 +658,7 @@ function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown) 
   hitLine.setAttribute('stroke-width', '24');
   hitLine.style.pointerEvents = 'auto'; // re-enables interaction under the div's own pointer-events:none (see onAdd())
   hitLine.style.cursor = 'grab';
+  hitLine.style.touchAction = 'none'; // without this, the browser claims the first finger movement as a pan/zoom gesture and fires pointercancel, tearing down the drag before it starts
   hitLine.addEventListener('pointerdown', (e) => {
     e.stopPropagation(); // stop the map underneath from starting its own drag/pan
     e.preventDefault();
@@ -652,7 +676,14 @@ function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown) 
   visibleLine.setAttribute('stroke-dasharray', '5 4');
   g.appendChild(visibleLine);
 
-  const time = findTimeForAzimuth(points, azimuthDeg);
+  let time;
+  if (azimuthDeg === edgeTimes.facadeRange.originalStartAzimuthDeg) {
+    time = edgeTimes.sunrise;
+  } else if (azimuthDeg === edgeTimes.facadeRange.originalEndAzimuthDeg) {
+    time = edgeTimes.sunset;
+  } else {
+    time = findTimeForAzimuth(points, azimuthDeg);
+  }
   if (time) {
     const label = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     label.setAttribute('transform', `translate(${tipX}, ${tipY})`);

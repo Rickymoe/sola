@@ -118,17 +118,20 @@ function clampAzimuthToArc(candidateAzimuthDeg, startAzimuthDeg, endAzimuthDeg) 
 // linearly interpolating between the two chronologically-adjacent points
 // (in `points`, as returned by sampleDayArc -- already time-ordered) whose
 // azimuths bracket it. Returns null if azimuthDeg never occurs that day
-// (outside the arc's own sunrise-to-sunset azimuth sweep). Assumes azimuth
-// moves in one consistent direction through the day, true at all but
-// extreme high-latitude edge cases -- same accepted-edge-case standard as
-// zonedMidnightUtcMs's DST handling above.
+// (outside the arc's own sunrise-to-sunset azimuth sweep). `span`/`target`
+// use the signed shortest-angle delta (wrapped into (-180, 180]) rather than
+// a raw subtraction, so a sample pair that crosses the 359°->0° seam (the
+// sun passing north of zenith -- true for the southern hemisphere and much
+// of the tropics) still interpolates correctly instead of producing a wildly
+// wrong fraction.
 function findTimeForAzimuth(points, azimuthDeg) {
   for (let i = 1; i < points.length; i++) {
     const prev = points[i - 1];
     const cur = points[i];
-    const span = cur.azimuthDeg - prev.azimuthDeg;
+    const span = ((cur.azimuthDeg - prev.azimuthDeg + 540) % 360) - 180;
     if (span === 0) continue;
-    const frac = (azimuthDeg - prev.azimuthDeg) / span;
+    const target = ((azimuthDeg - prev.azimuthDeg + 540) % 360) - 180;
+    const frac = target / span;
     if (frac >= 0 && frac <= 1) {
       const ms = prev.t.getTime() + frac * (cur.t.getTime() - prev.t.getTime());
       return new Date(ms);
