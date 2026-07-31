@@ -303,7 +303,7 @@ function setupLocationControls() {
       sunOverlay.clearFacadeRange();
       facadeActive = false;
     } else {
-      sunOverlay.activateFacadeRange();
+      sunOverlay.activateFacadeRange(months);
       // activateFacadeRange() silently no-ops during polar night (no daylight
       // arc to seed from -- see its own guard in js/sun-overlay.js), so read
       // back the overlay's actual resulting state instead of assuming

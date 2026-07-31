@@ -39,7 +39,7 @@ function createSunPathOverlay() {
       // fires at ~60Hz while the compass is active).
       this.center = { x: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN, y: SUN_OVERLAY_RADIUS + SUN_OVERLAY_MARGIN };
       this.headingArrowGroup = null; // the <g> built by render(), rotated directly by setHeading()'s fast path
-      this.facadeRange = null; // { startAzimuthDeg, endAzimuthDeg, originalStartAzimuthDeg, originalEndAzimuthDeg } or null -- see activateFacadeRange()
+      this.facadeRange = null; // { startAzimuthDeg, endAzimuthDeg, originalStartAzimuthDeg, originalEndAzimuthDeg, seedStartAzimuthDeg, seedEndAzimuthDeg, createdMonthName } or null -- see activateFacadeRange()
       this._facadeRenderPending = false; // true while a scheduleFacadeRender() rAF callback is queued, so pointer moves don't stack up extra render() calls
     }
 
@@ -146,25 +146,62 @@ function createSunPathOverlay() {
     // from there by dragging an edge inward. No-op if there's no month/arc
     // to seed from yet (button is hidden in that state anyway -- see
     // js/app.js -- but guard here too since this is a public method).
-    activateFacadeRange() {
-      if (!this.month || this.month.points.length < 2) return;
-      const first = this.month.points[0].azimuthDeg;
-      const second = this.month.points[1].azimuthDeg;
-      const last = this.month.points[this.month.points.length - 1].azimuthDeg;
-      // Signed shortest-angle delta (-180..180]: negative means the arc's azimuth
-      // is actually sweeping counter-clockwise sample-to-sample (the sun passes
-      // north of zenith -- true for the southern hemisphere and much of the
-      // tropics), which is the opposite of isAzimuthInRange's clockwise-from-
-      // start-to-end assumption. Swap start/end in that case so the seeded
-      // range still covers the real daylight sweep instead of its complement.
+    // Computes the clockwise start/end azimuth pair for one month's own
+    // arc, handling the southern-hemisphere/tropics sweep-direction swap:
+    // signed shortest-angle delta (-180..180]) between the first two
+    // points -- negative means the arc's azimuth is actually sweeping
+    // counter-clockwise sample-to-sample (the sun passes north of zenith),
+    // the opposite of isAzimuthInRange's clockwise-from-start-to-end
+    // assumption, so start/end swap in that case.
+    arcAzimuthBounds(month) {
+      const first = month.points[0].azimuthDeg;
+      const second = month.points[1].azimuthDeg;
+      const last = month.points[month.points.length - 1].azimuthDeg;
       const signedDelta = ((second - first + 540) % 360) - 180;
-      const start = signedDelta >= 0 ? first : last;
-      const end = signedDelta >= 0 ? last : first;
+      return signedDelta >= 0 ? { start: first, end: last } : { start: last, end: first };
+    }
+
+    // `allMonths`, if given, is the full 12-month array (js/app.js's own
+    // `months`) -- used only to seed the OUTER clamp bound from the YEAR'S
+    // OWN widest day (longest dayLengthMs), not necessarily the currently
+    // selected month, so the user can always drag back out to the year's
+    // full field of view. Confirmed live: seeding the clamp from whichever
+    // month happened to be selected at activation time (e.g. November's
+    // narrow ~07:47-17:47 arc) permanently capped the handles there even
+    // after switching to July, with no way to widen back out short of
+    // toggling the whole facade off and back on while July was selected.
+    activateFacadeRange(allMonths) {
+      if (!this.month || this.month.points.length < 2) return;
+      const { start, end } = this.arcAzimuthBounds(this.month);
+
+      let widestMonth = this.month;
+      if (allMonths) {
+        for (const mo of allMonths) {
+          if (mo.points.length >= 2 && mo.dayLengthMs !== null &&
+              (widestMonth.dayLengthMs === null || mo.dayLengthMs > widestMonth.dayLengthMs)) {
+            widestMonth = mo;
+          }
+        }
+      }
+      const outer = widestMonth.points.length >= 2 ? this.arcAzimuthBounds(widestMonth) : { start, end };
+
       this.facadeRange = {
         startAzimuthDeg: start,
         endAzimuthDeg: end,
-        originalStartAzimuthDeg: start,
-        originalEndAzimuthDeg: end,
+        // The DRAG CLAMP bound -- the year's widest day, per the comment
+        // above -- deliberately NOT the same as seedStart/EndAzimuthDeg
+        // below now that the two can differ (activating in a narrower
+        // month than the year's widest one).
+        originalStartAzimuthDeg: outer.start,
+        originalEndAzimuthDeg: outer.end,
+        // The CURRENT month's own bounds at creation time -- used only by
+        // buildFacadeHandle()'s exact-badge-time shortcut, to tell "this
+        // handle is still exactly where it started" apart from "this
+        // handle happens to sit at the year-wide clamp bound" (the two
+        // used to be identical before the clamp bound could differ from
+        // the seeded month).
+        seedStartAzimuthDeg: start,
+        seedEndAzimuthDeg: end,
         // Which month this range was seeded from -- render()'s label
         // shortcut (show the exact sunrise/sunset badge time for an
         // undragged handle) is only valid while viewing THIS SAME month;
@@ -223,7 +260,9 @@ function createSunPathOverlay() {
 
     // Clamps a candidate azimuth for the given edge so it can only move
     // INWARD: never past its own original bound (activateFacadeRange()'s
-    // starting position), never past the other edge's current position.
+    // originalStart/EndAzimuthDeg -- the year's widest day, not necessarily
+    // the month the range was seeded from), never past the other edge's
+    // current position.
     // Delegates to clampAzimuthToArc() (js/sun-year.js), which clamps onto
     // the arc using true circular distance to each boundary -- an earlier
     // version of this method compared positions in one fixed clockwise
@@ -727,19 +766,23 @@ function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown, 
 
   // The exact-badge-time shortcut below only holds while viewing the SAME
   // month the facade range was created in -- an undragged handle's azimuth
-  // still equals its own originalStart/EndAzimuthDeg after switching
-  // months (the bearing itself never changes), but that fixed bearing is
+  // still equals its own seedStart/EndAzimuthDeg after switching months
+  // (the bearing itself never changes), but that fixed bearing is
   // generally nowhere near the NEW month's own sunrise/sunset direction, so
   // showing this month's badge time there is wrong regardless of whether
   // the bearing happens to occur this month at all. Confirmed live: an
   // undragged July-seeded range still showed February's own sunrise/sunset
   // times while the dashed lines kept pointing at July's (very different)
   // bearings. Once the month differs from where it was created,
-  // findTimeForAzimuth() is the only correct source of truth.
+  // findTimeForAzimuth() is the only correct source of truth. Compares
+  // against seedStart/EndAzimuthDeg (the CURRENT month's own bounds at
+  // creation), not originalStart/EndAzimuthDeg (the year-wide DRAG CLAMP
+  // bound) -- those two used to be the same value, but no longer are once
+  // the facade is activated in a narrower month than the year's widest one.
   let time;
-  if (edgeTimes.sameMonth && azimuthDeg === edgeTimes.facadeRange.originalStartAzimuthDeg) {
+  if (edgeTimes.sameMonth && azimuthDeg === edgeTimes.facadeRange.seedStartAzimuthDeg) {
     time = edgeTimes.sunrise;
-  } else if (edgeTimes.sameMonth && azimuthDeg === edgeTimes.facadeRange.originalEndAzimuthDeg) {
+  } else if (edgeTimes.sameMonth && azimuthDeg === edgeTimes.facadeRange.seedEndAzimuthDeg) {
     time = edgeTimes.sunset;
   } else {
     time = findTimeForAzimuth(points, azimuthDeg, edge);
