@@ -222,6 +222,7 @@ function updateFacadeButtonVisibility() {
   const btn = document.getElementById('facade-btn');
   if (!btn) return;
   btn.classList.toggle('hidden', !currentPosition);
+  btn.classList.toggle('active', facadeActive);
 }
 
 function renderMonthButtons() {
@@ -312,6 +313,7 @@ function setupLocationControls() {
       // turning anything on).
       facadeActive = !!sunOverlay.facadeRange;
     }
+    updateFacadeButtonVisibility();
   });
 }
 
