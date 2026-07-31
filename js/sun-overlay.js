@@ -779,13 +779,28 @@ function buildFacadeHandle(center, azimuthDeg, points, timeZone, onPointerDown, 
   // creation), not originalStart/EndAzimuthDeg (the year-wide DRAG CLAMP
   // bound) -- those two used to be the same value, but no longer are once
   // the facade is activated in a narrower month than the year's widest one.
+  // The rising/setting-half restriction below (findTimeForAzimuth's `edge`
+  // argument) doesn't fit polar day: with the sun up nearly 24h, there's no
+  // real "wrong side of solar noon" the way there is on a normal day, and
+  // restricting the search still excludes roughly half the compass for
+  // no good reason. Confirmed live (Hammerfest, July): dragging the
+  // sunrise-side handle from due east toward due west showed "-" across
+  // most of that sweep, reading as if the pill had disappeared, even
+  // though the sun genuinely crosses every one of those bearings at some
+  // point in the day. `sunrise`/`sunset` are both null exactly when a
+  // month has no real sunrise/sunset crossing (sampleDayArc()'s own
+  // convention for polar day/night) -- pass no edge in that case so
+  // findTimeForAzimuth() searches the whole day instead of just one half.
+  const polarDayOrNight = !edgeTimes.sunrise && !edgeTimes.sunset;
+  const searchEdge = polarDayOrNight ? undefined : edge;
+
   let time;
   if (edgeTimes.sameMonth && azimuthDeg === edgeTimes.facadeRange.seedStartAzimuthDeg) {
     time = edgeTimes.sunrise;
   } else if (edgeTimes.sameMonth && azimuthDeg === edgeTimes.facadeRange.seedEndAzimuthDeg) {
     time = edgeTimes.sunset;
   } else {
-    time = findTimeForAzimuth(points, azimuthDeg, edge);
+    time = findTimeForAzimuth(points, azimuthDeg, searchEdge);
   }
   // Always drawn, even when `time` is null (this fixed bearing doesn't
   // occur anywhere on the CURRENT month's arc -- e.g. dragged to a bearing
