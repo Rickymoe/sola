@@ -21,7 +21,7 @@
 // sunrise/sunset icons + time labels (drawn right at the rim, where the
 // arc starts/ends) have room to render without being clipped by the SVG's
 // own viewport.
-const SUN_OVERLAY_MARGIN = 52;
+const SUN_OVERLAY_MARGIN = 90; // must clear FACADE_HANDLE_RADIUS + the time pill's own half-extent (~19px), else the pill gets clipped by the SVG's own edge instead of just visually colliding with the compass ring
 const SUN_OVERLAY_CANVAS = SUN_OVERLAY_SIZE + SUN_OVERLAY_MARGIN * 2;
 
 function createSunPathOverlay() {
@@ -631,9 +631,14 @@ function buildNowLabel(point, center, tangent, timeText) {
   return g;
 }
 
-// Past the compass ring (SUN_OVERLAY_RADIUS + 38) so the facade handles
-// have their own clear grab zone, not overlapping the ring visually.
-const FACADE_HANDLE_RADIUS = SUN_OVERLAY_RADIUS + 45;
+// Past the compass ring (SUN_OVERLAY_RADIUS + 38, badge radius ~10, so the
+// ring's badges span roughly SUN_OVERLAY_RADIUS + 28 to + 48) with enough
+// margin that the time-label pill (its own ~8px half-height) clears the
+// badge even in the worst case: a handle dragged to land exactly on one of
+// the four N/Ø/S/V compass directions. +45 wasn't enough margin -- confirmed
+// live, the pill collided with the "V" badge when a handle was dragged to
+// due west.
+const FACADE_HANDLE_RADIUS = SUN_OVERLAY_RADIUS + 65;
 
 // Builds one draggable-looking edge of the facade field-of-view pie slice:
 // a dashed line from center out past the rim (see FACADE_HANDLE_RADIUS),
