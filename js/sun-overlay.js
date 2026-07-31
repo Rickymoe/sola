@@ -56,7 +56,20 @@ function createSunPathOverlay() {
       this.svg.setAttribute('height', String(SUN_OVERLAY_CANVAS));
       this.div.appendChild(this.svg);
 
-      this.getPanes().overlayLayer.appendChild(this.div);
+      // overlayLayer (Google's own default for custom overlays) never
+      // receives DOM mouse/pointer events by design -- it's meant for
+      // passive content like polylines so the map stays draggable
+      // underneath. The facade handles need real pointer events to be
+      // draggable, so this whole div goes in overlayMouseTarget instead
+      // (the pane Maps documents specifically for elements that must
+      // receive mouse events). Everything except the handles' own
+      // hit-lines still passes clicks through to the map beneath, via the
+      // div's own pointer-events:none plus each hit-line's explicit
+      // pointer-events:auto override (see buildFacadeHandle()) -- CSS
+      // pointer-events governs at a finer grain than which pane the node
+      // sits in, so moving the pane doesn't make the rest of the overlay
+      // (arc, wedge, compass ring, badges) suddenly block map dragging.
+      this.getPanes().overlayMouseTarget.appendChild(this.div);
       this.render();
     }
 
