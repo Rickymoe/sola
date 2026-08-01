@@ -42,6 +42,8 @@ function createSunPathOverlay() {
       this.facadeRange = null; // { startAzimuthDeg, endAzimuthDeg, originalStartAzimuthDeg, originalEndAzimuthDeg, seedStartAzimuthDeg, seedEndAzimuthDeg } or null -- see activateFacadeRange()
       this._facadeRenderPending = false; // true while a scheduleFacadeRender() rAF callback is queued, so pointer moves don't stack up extra render() calls
       this.scrubDate = null; // Date or null -- set via setScrubDate(), the day-scrubbing time slider's chosen instant for a NON-current month (js/app.js). Ignored while this.month.isToday: the live "now" dot takes priority there -- see render()'s dot section.
+      this._scrubRenderPending = false; // same rAF-batching role as _facadeRenderPending, for startScrubDrag()'s own render calls
+      this.onScrubDrag = null; // (date: Date) => void, set once by js/app.js -- called by startScrubDrag() on every dragged update so the time slider (js/app.js's own state) can stay in sync without this class knowing anything about sliders
     }
 
     onAdd() {
@@ -305,6 +307,66 @@ function createSunPathOverlay() {
       });
     }
 
+    // Drags the day/time scrubber's dot or pill along the CURRENT day's own
+    // arc (this.month.points) -- structurally identical lifecycle to
+    // startFacadeDrag() (window-level listeners so fast pointer movement
+    // past the small hit target doesn't drop the drag), but the position ->
+    // value mapping is different: the facade handles only need an azimuth
+    // (a fixed compass direction), while a point ON the day's arc varies in
+    // both azimuth and altitude/radius over the day, so this snaps to the
+    // nearest actually-sampled point (findNearestPoint(), js/sun-year.js)
+    // instead of computing an azimuth. That snap also gives clamping for
+    // free -- the dot can never be dragged off the day's real arc.
+    startScrubDrag(pointerEvent, hitElement) {
+      if (!this.month || !this.month.points || this.month.points.length === 0) return;
+      const pointerId = pointerEvent.pointerId;
+      hitElement.style.cursor = 'grabbing';
+
+      const onMove = (moveEvent) => {
+        if (moveEvent.pointerId !== pointerId) return;
+        // Guards against a stale drag writing into the wrong day's points
+        // if the month/day slider changes mid-drag (two-handed use) --
+        // same defensive pattern as startFacadeDrag's own facadeRange check.
+        if (!this.month || !this.month.points || this.month.points.length === 0) return;
+        const rect = this.svg.getBoundingClientRect();
+        // month.points are in the overlay's own polar coordinate space, NOT
+        // yet offset by SUN_OVERLAY_MARGIN (see sunPolarToXY's own comment
+        // in js/sun-year.js) -- subtract it here so this compares apples to
+        // apples with findNearestPoint, matching how render() adds it back
+        // when building offsetPoints for drawing.
+        const localX = moveEvent.clientX - rect.left - SUN_OVERLAY_MARGIN;
+        const localY = moveEvent.clientY - rect.top - SUN_OVERLAY_MARGIN;
+
+        const nearest = findNearestPoint(this.month.points, localX, localY);
+        this.scrubDate = nearest.t;
+        if (this.onScrubDrag) this.onScrubDrag(this.scrubDate);
+        this.scheduleScrubRender();
+      };
+
+      const onUp = (upEvent) => {
+        if (upEvent.pointerId !== pointerId) return;
+        hitElement.style.cursor = 'grab';
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+      };
+
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    }
+
+    // Same rAF-batching role as scheduleFacadeRender() -- pointer moves fire
+    // far more often than a render() needs to happen.
+    scheduleScrubRender() {
+      if (this._scrubRenderPending) return;
+      this._scrubRenderPending = true;
+      requestAnimationFrame(() => {
+        this._scrubRenderPending = false;
+        this.render();
+      });
+    }
+
     render() {
       if (!this.svg || !this.position) return;
       while (this.svg.firstChild) this.svg.removeChild(this.svg.firstChild);
@@ -438,6 +500,29 @@ function createSunPathOverlay() {
       if (dotPoint) {
         const dotX = dotPoint.x + SUN_OVERLAY_MARGIN;
         const dotY = dotPoint.y + SUN_OVERLAY_MARGIN;
+
+        // Wider invisible hit-circle first (same forgiving-touch-target
+        // trick as buildFacadeHandle's pillHit) -- the visible dot is only
+        // r=5, too small to reliably grab with a fingertip. Only present
+        // for a draggable scrub dot, never the pulsing "now" dot (today's
+        // real wall-clock position isn't user-draggable).
+        if (!pulsing) {
+          const dotHit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          dotHit.setAttribute('cx', String(dotX));
+          dotHit.setAttribute('cy', String(dotY));
+          dotHit.setAttribute('r', '15');
+          dotHit.setAttribute('fill', 'transparent');
+          dotHit.style.pointerEvents = 'auto';
+          dotHit.style.cursor = 'grab';
+          dotHit.style.touchAction = 'none';
+          dotHit.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this.startScrubDrag(e, dotHit);
+          });
+          this.svg.appendChild(dotHit);
+        }
+
         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         dot.setAttribute('cx', String(dotX));
         dot.setAttribute('cy', String(dotY));
@@ -451,7 +536,10 @@ function createSunPathOverlay() {
         if (pulsing) dot.setAttribute('class', 'sun-now-dot');
         this.svg.appendChild(dot);
         const tangent = { x: dotPoint.tangentX, y: dotPoint.tangentY };
-        this.svg.appendChild(buildNowLabel({ x: dotX, y: dotY }, this.center, tangent, formatTime(dotDate, this.month.timeZone)));
+        // Only the scrub dot's pill is draggable -- the pulsing "now" dot's
+        // pill stays display-only, same reasoning as the dotHit circle above.
+        const scrubOnPointerDown = pulsing ? undefined : (e, hitEl) => this.startScrubDrag(e, hitEl);
+        this.svg.appendChild(buildNowLabel({ x: dotX, y: dotY }, this.center, tangent, formatTime(dotDate, this.month.timeZone), scrubOnPointerDown));
       }
 
       if (this.heading !== null) {
@@ -672,7 +760,7 @@ function buildSunMarker(point, time, isSunrise, timeZone) {
 // day. `point` must already be offset by SUN_OVERLAY_MARGIN, same
 // convention as the dot's own cx/cy; `center` disambiguates which of the
 // two perpendicular directions points away from the wedge (outward).
-function buildNowLabel(point, center, tangent, timeText) {
+function buildNowLabel(point, center, tangent, timeText, onPointerDown) {
   const LABEL_GAP = 20; // px perpendicular to the arc -- clears the widest glow layer (16px stroke, 8px half-width) plus room for the pill itself
   const PILL_WIDTH = 34;
   const PILL_HEIGHT = 16;
@@ -694,6 +782,30 @@ function buildNowLabel(point, center, tangent, timeText) {
 
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('transform', `translate(${labelX}, ${labelY})`);
+
+  // Wider invisible hit-rect first (same forgiving-touch-target trick as
+  // buildFacadeHandle's own pillHit) -- the visible pill is only 34x16,
+  // comfortably clickable with a mouse but tight for a fingertip. Only
+  // present when onPointerDown is given (the scrub-dot case) -- the
+  // pulsing "now" dot's pill calls this with no 5th argument and stays
+  // non-interactive.
+  if (onPointerDown) {
+    const pillHit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    pillHit.setAttribute('x', '-22');
+    pillHit.setAttribute('y', '-15');
+    pillHit.setAttribute('width', '44');
+    pillHit.setAttribute('height', '30');
+    pillHit.setAttribute('fill', 'transparent');
+    pillHit.style.pointerEvents = 'auto';
+    pillHit.style.cursor = 'grab';
+    pillHit.style.touchAction = 'none';
+    pillHit.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      onPointerDown(e, pillHit);
+    });
+    g.appendChild(pillHit);
+  }
 
   const pill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
   pill.setAttribute('x', String(-PILL_WIDTH / 2));
