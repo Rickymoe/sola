@@ -327,7 +327,10 @@ function createSunPathOverlay() {
         // Guards against a stale drag writing into the wrong day's points
         // if the month/day slider changes mid-drag (two-handed use) --
         // same defensive pattern as startFacadeDrag's own facadeRange check.
-        if (!this.month || !this.month.points || this.month.points.length === 0) return;
+        // Also bails if the current month got selected mid-drag (isToday):
+        // a scrub drag is never semantically valid there -- the pulsing
+        // "now" dot owns that case, not the scrub dot (see render()).
+        if (!this.month || !this.month.points || this.month.points.length === 0 || this.month.isToday) return;
         const rect = this.svg.getBoundingClientRect();
         // month.points are in the overlay's own polar coordinate space, NOT
         // yet offset by SUN_OVERLAY_MARGIN (see sunPolarToXY's own comment

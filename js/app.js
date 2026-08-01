@@ -95,6 +95,11 @@ function initMap() {
   // own rounded 0-1000 fraction and setting it back would risk a tiny
   // mismatch with the dot's real position, plus a redundant render).
   sunOverlay.onScrubDrag = (date) => {
+    // Guards against a mid-drag switch to the current month (two-handed
+    // touch use): currentDayMonth is cleared to null when the current
+    // month gets selected, and timeSliderBounds() dereferences it
+    // unconditionally -- bail before that call rather than throw.
+    if (!currentDayMonth) return;
     const bounds = timeSliderBounds(currentDayMonth);
     if (!bounds) return;
     selectedTimeFraction = (date.getTime() - bounds.start.getTime()) /
