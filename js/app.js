@@ -87,6 +87,21 @@ function initMap() {
 
   sunOverlay = createSunPathOverlay();
   sunOverlay.setMap(map);
+
+  // Keeps the time slider in sync when the user drags the scrub dot/pill
+  // directly instead of moving the slider -- does NOT call setScrubDate()
+  // again (the overlay already holds the authoritative, exactly-snapped
+  // scrubDate from the drag itself; re-deriving a date from the slider's
+  // own rounded 0-1000 fraction and setting it back would risk a tiny
+  // mismatch with the dot's real position, plus a redundant render).
+  sunOverlay.onScrubDrag = (date) => {
+    const bounds = timeSliderBounds(currentDayMonth);
+    if (!bounds) return;
+    selectedTimeFraction = (date.getTime() - bounds.start.getTime()) /
+      (bounds.end.getTime() - bounds.start.getTime());
+    document.getElementById('time-slider').value = String(Math.round(selectedTimeFraction * 1000));
+    document.getElementById('time-slider-value').textContent = formatTime(date, currentDayMonth.timeZone);
+  };
 }
 
 // Just recenters the view on load -- does not drop a pin, so the
