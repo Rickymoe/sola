@@ -153,6 +153,33 @@ function findPeakTime(points) {
   return points[findPeakIndex(points)].t;
 }
 
+// Finds the point in `points` (each {x, y, t, ...}, same shape as
+// sampleDayArc()'s output) nearest to (x, y) by Euclidean distance in the
+// overlay's own polar coordinate space (NOT yet offset by SUN_OVERLAY_MARGIN
+// -- callers are responsible for subtracting that offset from x/y first, the
+// same convention every other consumer of `points` already follows). Used
+// by the day/time scrubber's draggable dot/pill (js/sun-overlay.js's
+// startScrubDrag) to snap a raw pointer position to an actual sampled
+// instant on that day's arc, so the dragged dot always lands on a real
+// timestamp instead of an arbitrary screen position. Returns null for an
+// empty array (defensive -- startScrubDrag already guards against this
+// before calling, so points is never actually empty in practice).
+function findNearestPoint(points, x, y) {
+  if (points.length === 0) return null;
+  let nearest = points[0];
+  let nearestDistSq = Infinity;
+  for (const p of points) {
+    const dx = p.x - x;
+    const dy = p.y - y;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < nearestDistSq) {
+      nearestDistSq = distSq;
+      nearest = p;
+    }
+  }
+  return nearest;
+}
+
 // Finds the Date the sun crosses a given azimuth along one day's arc, by
 // linearly interpolating between the two chronologically-adjacent points
 // (in `points`, as returned by sampleDayArc -- already time-ordered) whose
